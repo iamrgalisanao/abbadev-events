@@ -15,7 +15,7 @@ Apache with PHP-FPM and MySQL. Receipts are stored on the private local disk.
 ```bash
 sudo mkdir -p /var/www && sudo chown -R $USER:$USER /var/www
 cd /var/www
-git clone <your-abbadev-events-remote> abbadev-events
+git clone https://github.com/iamrgalisanao/abbadev-events.git abbadev-events
 cd abbadev-events
 composer install --no-dev --optimize-autoloader
 ```
