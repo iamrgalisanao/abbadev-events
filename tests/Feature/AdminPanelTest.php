@@ -55,6 +55,16 @@ class AdminPanelTest extends TestCase
         $this->get('/admin/login')->assertOk();
     }
 
+    public function test_events_list_renders(): void
+    {
+        $this->payment();
+
+        Livewire::actingAs($this->admin())
+            ->test(\App\Filament\Resources\Events\Pages\ListEvents::class)
+            ->assertOk()
+            ->assertSee('From Idea to Intelligent System');
+    }
+
     public function test_list_page_renders_with_payment(): void
     {
         $payment = $this->payment();
