@@ -17,6 +17,11 @@ class PaymentsTable
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            // Re-render the list (table + tab badge counts) on an interval so the
+            // "For verification / Verified / ..." counts stay correct after a
+            // verify or delete without a manual page refresh. Verify/delete also
+            // update the badges instantly, since the action re-renders the page.
+            ->poll('10s')
             ->columns([
                 TextColumn::make('registration.registration_number')
                     ->label('Reg #')

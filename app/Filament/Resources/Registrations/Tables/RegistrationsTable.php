@@ -13,6 +13,8 @@ class RegistrationsTable
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            // Keep the tab badge counts live without a manual refresh.
+            ->poll('10s')
             ->columns([
                 TextColumn::make('registration_number')
                     ->label('Reg #')
