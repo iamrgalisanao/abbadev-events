@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\Payments\Pages\ListPayments;
 use App\Filament\Resources\Payments\Pages\ViewPayment;
+use App\Filament\Resources\Registrations\Pages\ListRegistrations;
+use App\Filament\Resources\Registrations\Pages\ViewRegistration;
 use App\Models\Event;
 use App\Models\Payment;
 use App\Models\Registration;
@@ -71,5 +73,35 @@ class AdminPanelTest extends TestCase
             ->test(ViewPayment::class, ['record' => $payment->getRouteKey()])
             ->assertOk()
             ->assertSee('1000123456789');
+    }
+
+    public function test_registrations_list_and_view_render(): void
+    {
+        $payment = $this->payment();
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin)
+            ->test(ListRegistrations::class)
+            ->assertOk()
+            ->assertSee($payment->registration->registration_number);
+
+        Livewire::actingAs($admin)
+            ->test(ViewRegistration::class, ['record' => $payment->registration->getRouteKey()])
+            ->assertOk()
+            ->assertSee($payment->registration->email);
+    }
+
+    public function test_registrations_export_downloads_csv(): void
+    {
+        $payment = $this->payment();
+
+        $response = $this->actingAs($this->admin())->get(route('admin.registrations.export'));
+
+        $response->assertOk();
+        $this->assertStringContainsString('text/csv', (string) $response->headers->get('Content-Type'));
+        $this->assertStringContainsString(
+            $payment->registration->registration_number,
+            $response->streamedContent(),
+        );
     }
 }

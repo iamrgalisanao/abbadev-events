@@ -24,6 +24,8 @@ class PaymentResource extends Resource
 
     protected static ?string $navigationLabel = 'Payment verification';
 
+    protected static ?int $navigationSort = 2;
+
     public static function canCreate(): bool
     {
         return false;
