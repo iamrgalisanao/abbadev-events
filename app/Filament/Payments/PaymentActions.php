@@ -6,9 +6,11 @@ use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Services\PaymentService;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The four admin verification actions, defined once and reused on both the
@@ -52,6 +54,25 @@ class PaymentActions
     public static function markMismatch(): Action
     {
         return self::statusAction('mismatch', 'Amount Mismatch', PaymentStatus::AmountMismatch, 'warning', Heroicon::OutlinedScale);
+    }
+
+    /**
+     * Permanently delete a payment, its receipt file, and its registration —
+     * for cleaning up test/spam records.
+     */
+    public static function delete(): DeleteAction
+    {
+        return DeleteAction::make()
+            ->modalHeading('Delete this record')
+            ->modalDescription('This permanently deletes the payment, its uploaded receipt, and the registration. This cannot be undone.')
+            ->before(function (Payment $record): void {
+                if ($record->receipt_path) {
+                    Storage::disk('local')->delete($record->receipt_path);
+                }
+            })
+            ->after(function (Payment $record): void {
+                $record->registration?->delete();
+            });
     }
 
     protected static function statusAction(string $name, string $label, PaymentStatus $status, string $color, Heroicon $icon): Action

@@ -27,6 +27,7 @@ class ViewPayment extends ViewRecord
             PaymentActions::reject(),
             PaymentActions::markDuplicate(),
             PaymentActions::markMismatch(),
+            PaymentActions::delete(),
         ];
     }
 }

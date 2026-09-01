@@ -43,6 +43,7 @@ class RegistrationApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('event.expected_amount', 399)
+            ->assertJsonPath('event.starts_at', '2026-09-05T14:00:00+08:00')
             ->assertJsonPath('payment.gcash_number', '0928 320 7029');
 
         $this->assertMatchesRegularExpression(

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Payments\Schemas;
 
 use App\Models\Payment;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -39,6 +40,24 @@ class PaymentInfolist
                         TextEntry::make('payment_method')->label('Method'),
                         TextEntry::make('status')->label('Payment status')->badge(),
                         TextEntry::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A'),
+                    ]),
+
+                Section::make('Receipt')
+                    ->visible(fn (Payment $record) => (bool) $record->receipt_path)
+                    ->schema([
+                        ImageEntry::make('receipt_path')
+                            ->hiddenLabel()
+                            ->height(360)
+                            ->extraImgAttributes(['style' => 'border-radius:10px;max-width:100%;'])
+                            ->visible(fn (Payment $record) => $record->receipt_path && ! str_ends_with(strtolower($record->receipt_path), '.pdf'))
+                            ->state(fn (Payment $record) => route('admin.receipts', $record)),
+                        TextEntry::make('receipt_pdf')
+                            ->hiddenLabel()
+                            ->visible(fn (Payment $record) => str_ends_with(strtolower((string) $record->receipt_path), '.pdf'))
+                            ->state('This receipt is a PDF.')
+                            ->hint('Open PDF')
+                            ->hintIcon('heroicon-o-arrow-top-right-on-square')
+                            ->url(fn (Payment $record) => route('admin.receipts', $record), true),
                     ]),
 
                 Section::make('Verification')

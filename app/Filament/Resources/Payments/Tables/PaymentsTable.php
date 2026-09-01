@@ -3,10 +3,13 @@
 namespace App\Filament\Resources\Payments\Tables;
 
 use App\Filament\Payments\PaymentActions;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentsTable
 {
@@ -52,6 +55,25 @@ class PaymentsTable
             ->recordActions([
                 ViewAction::make(),
                 PaymentActions::confirm(),
+                PaymentActions::delete(),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->modalDescription('This permanently deletes the selected payments, their receipts, and registrations.')
+                        ->before(function ($records): void {
+                            foreach ($records as $record) {
+                                if ($record->receipt_path) {
+                                    Storage::disk('local')->delete($record->receipt_path);
+                                }
+                            }
+                        })
+                        ->after(function ($records): void {
+                            foreach ($records as $record) {
+                                $record->registration?->delete();
+                            }
+                        }),
+                ]),
             ]);
     }
 }
