@@ -128,6 +128,72 @@ class RegistrationApiTest extends TestCase
             ->assertJsonPath('status', RegistrationStatus::Pending->value);
     }
 
+    public function test_step_one_normalizes_phone_to_e164(): void
+    {
+        $this->event();
+
+        $this->postJson('/api/registrations', [
+            'name' => 'Juan Dela Cruz',
+            'email' => 'phone@example.com',
+            'phone' => '0917 123 4567',
+            'event' => 'idea-to-intelligent-system',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('registrations', [
+            'email' => 'phone@example.com',
+            'phone' => '+639171234567',
+        ]);
+    }
+
+    public function test_step_one_rejects_an_invalid_phone(): void
+    {
+        $this->event();
+
+        $this->postJson('/api/registrations', [
+            'name' => 'Juan Dela Cruz',
+            'email' => 'badphone@example.com',
+            'phone' => '12345',
+            'event' => 'idea-to-intelligent-system',
+        ])->assertStatus(422)->assertJsonValidationErrors('phone');
+    }
+
+    public function test_payment_reference_is_normalized_to_digits(): void
+    {
+        Storage::fake('local');
+        $event = $this->event();
+        $registration = $this->makeRegistration($event);
+
+        $this->post("/api/registrations/{$registration->id}/payment", [
+            'reference_number' => '2045 667 982375',
+            'amount_submitted' => 399,
+            'receipt' => UploadedFile::fake()->create('r.jpg', 100, 'image/jpeg'),
+        ])->assertCreated();
+
+        $this->assertSame('2045667982375', $registration->payments()->first()->reference_number);
+    }
+
+    public function test_duplicate_reference_detected_across_formats(): void
+    {
+        Storage::fake('local');
+        $event = $this->event();
+        $first = $this->makeRegistration($event);
+        $second = $this->makeRegistration($event, 'second@example.com');
+
+        $this->post("/api/registrations/{$first->id}/payment", [
+            'reference_number' => '3000 123 456',
+            'amount_submitted' => 399,
+            'receipt' => UploadedFile::fake()->create('a.jpg', 100, 'image/jpeg'),
+        ])->assertCreated();
+
+        $this->post("/api/registrations/{$second->id}/payment", [
+            'reference_number' => '3000123456',
+            'amount_submitted' => 399,
+            'receipt' => UploadedFile::fake()->create('b.jpg', 100, 'image/jpeg'),
+        ])
+            ->assertCreated()
+            ->assertJsonPath('flags.duplicate', true);
+    }
+
     protected function makeRegistration(Event $event, string $email = 'juan@example.com'): Registration
     {
         return Registration::create([
