@@ -57,6 +57,44 @@ class RegistrationApiTest extends TestCase
         ]);
     }
 
+    public function test_registration_number_is_max_based_and_survives_deletions(): void
+    {
+        $this->event();
+        $year = now()->format('Y');
+
+        // Three sign-ups → -0001, -0002, -0003.
+        foreach (['a', 'b', 'c'] as $i) {
+            $this->postJson('/api/registrations', [
+                'name' => "User {$i}",
+                'email' => "{$i}@example.com",
+                'phone' => '09171234567',
+                'event' => 'idea-to-intelligent-system',
+                'audience' => 'Student',
+                'lead_source' => 'fb-ad-landing',
+            ])->assertCreated();
+        }
+
+        // Delete a middle row. A count-based sequence would now regenerate an
+        // existing number (-0003) and hit the unique constraint — the bug.
+        Registration::where('registration_number', "ABBA-SEM-{$year}-0002")->delete();
+
+        // MAX-based: the next number continues past the highest ever issued and
+        // never collides with the surviving -0003.
+        $this->postJson('/api/registrations', [
+            'name' => 'User d',
+            'email' => 'd@example.com',
+            'phone' => '09171234567',
+            'event' => 'idea-to-intelligent-system',
+            'audience' => 'Student',
+            'lead_source' => 'fb-ad-landing',
+        ])->assertCreated()
+            ->assertJsonPath('registration_number', "ABBA-SEM-{$year}-0004");
+
+        $this->assertDatabaseHas('registrations', [
+            'registration_number' => "ABBA-SEM-{$year}-0004",
+        ]);
+    }
+
     public function test_matching_payment_is_queued_for_verification(): void
     {
         Storage::fake('local');

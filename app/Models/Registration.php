@@ -47,19 +47,25 @@ class Registration extends Model
     /**
      * Generate the next registration number for an event, e.g. ABBA-SEM-2026-0041.
      *
-     * Sequence is per-event, per-year. Low-volume Phase 1 so a count-based
-     * sequence is acceptable; the unique index on registration_number is the
-     * backstop against a rare concurrent collision (caller retries on clash).
+     * Sequence is per-event, per-year, derived from the highest number ever
+     * issued (MAX) rather than a row count — so deleting a registration never
+     * reissues an existing number. The 4-digit zero-padded suffix means the
+     * lexical max equals the numeric max. lockForUpdate serialises concurrent
+     * allocations when the caller wraps this in a transaction; the unique index
+     * and the caller's retry loop remain the final backstop.
      */
     public static function generateNumber(Event $event): string
     {
         $year = now()->format('Y');
         $prefix = "ABBA-{$event->event_code}-{$year}-";
 
-        $count = static::where('event_id', $event->id)
-            ->whereYear('created_at', $year)
-            ->count();
+        $lastNumber = static::where('event_id', $event->id)
+            ->where('registration_number', 'like', $prefix . '%')
+            ->lockForUpdate()
+            ->max('registration_number');
 
-        return $prefix . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
+        $next = $lastNumber ? ((int) substr($lastNumber, strlen($prefix))) + 1 : 1;
+
+        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }

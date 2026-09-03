@@ -10,6 +10,7 @@ use App\Models\Registration;
 use App\Services\N8nNotifier;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class RegistrationController extends Controller
 {
@@ -90,10 +91,13 @@ class RegistrationController extends Controller
     {
         foreach (range(1, 3) as $attempt) {
             try {
-                return Registration::create(array_merge($attributes, [
+                // Allocate the number and insert in one transaction so the
+                // lockForUpdate in generateNumber() serialises concurrent
+                // reservations for the same event.
+                return DB::transaction(fn () => Registration::create(array_merge($attributes, [
                     'event_id' => $event->id,
                     'registration_number' => Registration::generateNumber($event),
-                ]));
+                ])));
             } catch (QueryException $e) {
                 if ($attempt === 3 || ! str_contains(strtolower($e->getMessage()), 'unique')) {
                     throw $e;
