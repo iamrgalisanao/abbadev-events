@@ -52,6 +52,9 @@ class CertificatesTable
                 SelectFilter::make('status')
                     ->options(CertificateStatus::class)
                     ->label('Status'),
+                SelectFilter::make('session')
+                    ->relationship('registration.event', 'title')
+                    ->label('Session'),
             ])
             ->recordActions([
                 ViewAction::make(),
