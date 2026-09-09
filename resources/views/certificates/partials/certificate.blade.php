@@ -43,9 +43,14 @@
         ['label' => 'Duration', 'value' => $value('duration')],
     ])->filter(fn (array $item) => filled($item['value']))->values();
 
-    $showSeal = (bool) ($c['show_seal'] ?? true);
     $showLogo = (bool) ($c['show_logo'] ?? true);
     $sealYear = $issuedOn?->format('Y') ?? now()->format('Y');
+
+    // The centre cell between the two signatures holds one badge: the QR when
+    // there is a credential to scan, otherwise the seal.
+    $verificationUrl = $verificationUrl ?? null;
+    $showQr = (bool) ($c['show_qr'] ?? true) && filled($verificationUrl);
+    $showSeal = ! $showQr && (bool) ($c['show_seal'] ?? true);
 
     // Drawn once on the left, then echoed again mirrored onto the right edge.
     $ornament = <<<'SVG'
@@ -134,7 +139,7 @@
         </div>
 
         <footer class="ecert-foot">
-            {{-- Always a three-cell row so the seal stays centred whether one,
+            {{-- Always a three-cell row so the badge stays centred whether one,
                  two, or no signatories are filled in. --}}
             <div class="ecert-signatures">
                 <div class="ecert-signature">
@@ -146,8 +151,10 @@
                 </div>
 
                 <div class="ecert-seal-cell">
-                    @if ($showSeal)
-                        @include('filament.pages.partials.certificate-seal', [
+                    @if ($showQr)
+                        @include('certificates.partials.qr', ['url' => $verificationUrl])
+                    @elseif ($showSeal)
+                        @include('certificates.partials.seal', [
                             'label' => $value('seal_label', 'CERTIFIED'),
                             'year' => $sealYear,
                         ])

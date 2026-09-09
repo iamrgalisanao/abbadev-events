@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CertificateVerificationController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\RegistrationExportController;
 use Illuminate\Support\Facades\Route;
@@ -17,3 +18,15 @@ Route::get('/admin/registrations-export', [RegistrationExportController::class, 
 Route::get('/admin/receipts/{payment}', [ReceiptController::class, 'show'])
     ->middleware('auth')
     ->name('admin.receipts');
+
+// Public certificate verification — the destination of the QR code printed on
+// every issued certificate. No auth: anyone holding the credential ID can
+// check it, which is the point.
+Route::prefix('verify')
+    ->name('certificates.')
+    ->middleware('throttle:60,1')
+    ->group(function () {
+        Route::get('/{credential}', [CertificateVerificationController::class, 'show'])->name('verify');
+        Route::get('/{credential}/checks', [CertificateVerificationController::class, 'checks'])->name('checks');
+        Route::get('/{credential}/download', [CertificateVerificationController::class, 'download'])->name('download');
+    });

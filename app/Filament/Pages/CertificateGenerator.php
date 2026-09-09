@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Certificate;
 use App\Models\Registration;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -10,17 +11,22 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Fill-in-the-blanks e-certificate builder. Everything is typed by hand (or
  * prefilled from a registration), rendered live into a print-ready A4 landscape
  * certificate that the admin sends to the printer or saves as a PDF from the
  * browser's print dialog.
+ *
+ * Issuing stores the certificate, which is what makes the printed QR code
+ * meaningful: it points at the public verification page for that credential.
  */
 class CertificateGenerator extends Page
 {
@@ -52,9 +58,31 @@ class CertificateGenerator extends Page
             ->statePath('data')
             ->components([
                 Section::make('Recipient')
-                    ->description('Type the details, or pull them from an existing registration.')
+                    ->description('Type the details, or pull them from a registration or an already-issued certificate.')
                     ->columns(2)
                     ->schema([
+                        Select::make('certificate_id')
+                            ->label('Load an issued certificate')
+                            ->placeholder('Search an issued certificate…')
+                            ->searchable()
+                            ->options(fn (): array => static::certificateOptions())
+                            ->getSearchResultsUsing(fn (string $search): array => static::certificateOptions($search))
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set): void {
+                                $certificate = $state ? Certificate::find($state) : null;
+
+                                if (! $certificate) {
+                                    return;
+                                }
+
+                                foreach ($certificate->toTemplateArray() as $field => $value) {
+                                    $set($field, $value);
+                                }
+
+                                $set('registration_id', $certificate->registration_id);
+                            })
+                            ->helperText('Reprint or amend a certificate that has already been issued.')
+                            ->columnSpanFull(),
                         Select::make('registration_id')
                             ->label('Prefill from a registration')
                             ->placeholder('Search a registrant…')
@@ -217,8 +245,13 @@ class CertificateGenerator extends Page
                         Toggle::make('show_logo')
                             ->label('Show logo mark')
                             ->live(),
+                        Toggle::make('show_qr')
+                            ->label('Show verification QR')
+                            ->helperText('The QR takes the centre spot between the signatures.')
+                            ->live(),
                         Toggle::make('show_seal')
                             ->label('Show seal')
+                            ->helperText('Shown in place of the QR when the QR is off.')
                             ->live(),
                     ]),
             ]);
@@ -227,9 +260,14 @@ class CertificateGenerator extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('issue')
+                ->label('Issue & save')
+                ->icon(Heroicon::OutlinedShieldCheck)
+                ->action(fn () => $this->issue()),
             Action::make('print')
                 ->label('Print / Save as PDF')
                 ->icon(Heroicon::OutlinedPrinter)
+                ->color('gray')
                 ->action(fn () => $this->js('window.print()')),
             Action::make('reset')
                 ->label('Reset')
@@ -241,11 +279,78 @@ class CertificateGenerator extends Page
     }
 
     /**
+     * Persist the current form as an issued certificate, keyed on its
+     * credential ID so re-issuing the same ID amends the record the QR
+     * already points at rather than orphaning it.
+     */
+    public function issue(): void
+    {
+        $data = $this->form->getState();
+
+        $certificate = Certificate::updateOrCreate(
+            ['credential_id' => $data['credential_id']],
+            [
+                ...collect(Certificate::TEMPLATE_FIELDS)
+                    ->mapWithKeys(fn (string $field): array => [$field => $data[$field] ?? null])
+                    ->all(),
+                'registration_id' => $data['registration_id'] ?? null,
+                'issued_by' => Auth::id(),
+            ],
+        );
+
+        $this->data['certificate_id'] = $certificate->id;
+
+        Notification::make()
+            ->title('Certificate issued')
+            ->body('The printed QR code now resolves to '.$certificate->verificationUrl())
+            ->success()
+            ->persistent()
+            ->actions([
+                Action::make('open')
+                    ->label('Open verification page')
+                    ->url($certificate->verificationUrl(), shouldOpenInNewTab: true),
+            ])
+            ->send();
+    }
+
+    /**
+     * The verification URL the preview's QR encodes. Derived from the credential
+     * ID alone, so the QR is correct in the preview before the record is saved.
+     */
+    public function getVerificationUrl(): ?string
+    {
+        $credential = $this->data['credential_id'] ?? null;
+
+        return filled($credential) ? route('certificates.verify', $credential) : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function certificateOptions(?string $search = null): array
+    {
+        return Certificate::query()
+            ->when($search, fn ($query) => $query
+                ->where(fn ($inner) => $inner
+                    ->where('recipient_name', 'like', "%{$search}%")
+                    ->orWhere('credential_id', 'like', "%{$search}%")
+                    ->orWhere('activity_title', 'like', "%{$search}%")))
+            ->latest('id')
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (Certificate $certificate): array => [
+                $certificate->id => $certificate->recipient_name.' — '.$certificate->credential_id,
+            ])
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function defaultState(): array
     {
         return [
+            'certificate_id' => null,
             'registration_id' => null,
             'recipient_name' => '',
             'certificate_title' => 'Certificate of Participation',
@@ -266,6 +371,7 @@ class CertificateGenerator extends Page
             'accent' => 'gold',
             'seal_label' => 'CERTIFIED',
             'show_logo' => true,
+            'show_qr' => true,
             'show_seal' => true,
         ];
     }
