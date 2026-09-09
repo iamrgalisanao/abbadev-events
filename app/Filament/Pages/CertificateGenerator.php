@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\RegistrationStatus;
+use App\Filament\Resources\Certificates\CertificateResource;
 use App\Models\Certificate;
 use App\Models\Event;
 use App\Models\Registration;
@@ -13,13 +14,16 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Fill-in-the-blanks e-certificate builder. Everything is typed by hand (or
@@ -279,6 +283,26 @@ class CertificateGenerator extends Page
                 ->label('Issue & save')
                 ->icon(Heroicon::OutlinedShieldCheck)
                 ->action(fn () => $this->issue()),
+            Action::make('issueForSession')
+                ->label('Issue for the whole session')
+                ->icon(Heroicon::OutlinedUserGroup)
+                ->color('gray')
+                ->visible(fn (): bool => filled($this->data['event_id'] ?? null))
+                ->modalHeading('Issue for the whole session')
+                ->modalSubmitActionLabel('Issue certificates')
+                ->modalWidth(Width::Large)
+                ->schema([
+                    Toggle::make('include_unconfirmed')
+                        ->label('Include registrations that are not confirmed')
+                        ->helperText('Off by default. Someone who never completed payment usually should not receive a certificate.')
+                        ->live(),
+                    TextEntry::make('summary')
+                        ->label('What this will do')
+                        ->state(fn (callable $get): array => $this->bulkSummary((bool) $get('include_unconfirmed')))
+                        ->listWithLineBreaks()
+                        ->bulleted(),
+                ])
+                ->action(fn (array $data) => $this->bulkIssue((bool) ($data['include_unconfirmed'] ?? false))),
             Action::make('print')
                 ->label('Print / Save as PDF')
                 ->icon(Heroicon::OutlinedPrinter)
@@ -326,6 +350,203 @@ class CertificateGenerator extends Page
                     ->url($certificate->verificationUrl(), shouldOpenInNewTab: true),
             ])
             ->send();
+    }
+
+    /**
+     * Issue the copy currently in the form to every attendee of the selected
+     * session, one certificate each with its own credential ID.
+     *
+     * This only ever inserts into `certificates`. Registrations and sessions
+     * are read, never written, and an attendee who already holds a certificate
+     * is skipped rather than overwritten - so a second run tops up the people
+     * who were missed instead of reissuing everyone. The whole batch is one
+     * transaction: if any row fails, none are written.
+     */
+    public function bulkIssue(bool $includeUnconfirmed = false): void
+    {
+        $event = Event::find($this->data['event_id'] ?? null);
+
+        if (! $event) {
+            Notification::make()
+                ->title('Pick a session first')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $template = collect(Certificate::TEMPLATE_FIELDS)
+            ->mapWithKeys(fn (string $field): array => [$field => $this->data[$field] ?? null])
+            ->except(['credential_id', 'recipient_name'])
+            ->all();
+
+        if (blank($template['certificate_title'])) {
+            Notification::make()
+                ->title('Give the certificate a title first')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $recipients = $this->bulkRecipients($event->getKey(), $includeUnconfirmed);
+        $alreadyIssued = static::registrationsWithCertificates($recipients->modelKeys());
+
+        $issued = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($recipients, $alreadyIssued, $template, &$issued, &$skipped): void {
+            foreach ($recipients as $registration) {
+                if (in_array($registration->getKey(), $alreadyIssued, strict: true)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                Certificate::create([
+                    ...$template,
+                    'credential_id' => static::newCredentialId(),
+                    'recipient_name' => $registration->name,
+                    'registration_id' => $registration->getKey(),
+                    'issued_by' => Auth::id(),
+                ]);
+
+                $issued++;
+            }
+        });
+
+        if ($issued === 0) {
+            Notification::make()
+                ->title('Nothing to issue')
+                ->body($skipped > 0
+                    ? "Every attendee of {$event->title} already holds a certificate."
+                    : "No attendees of {$event->title} matched.")
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title($issued.' '.str('certificate')->plural($issued).' issued')
+            ->body(trim($event->title.'. '.($skipped > 0 ? $skipped.' already held one and were left untouched.' : '')))
+            ->success()
+            ->persistent()
+            ->actions([
+                Action::make('review')
+                    ->label('Review issued certificates')
+                    ->url(CertificateResource::getUrl()),
+            ])
+            ->send();
+    }
+
+    /**
+     * A plain-language account of what the batch will do, shown in the
+     * confirmation modal before anything is written.
+     *
+     * @return array<int, string>
+     */
+    public function bulkSummary(bool $includeUnconfirmed = false): array
+    {
+        $event = Event::find($this->data['event_id'] ?? null);
+
+        if (! $event) {
+            return ['Pick a session first.'];
+        }
+
+        $registrations = static::sessionRegistrations($event->getKey(), $includeUnconfirmed);
+        $recipients = static::deduplicate($registrations);
+        $collapsed = $registrations->count() - $recipients->count();
+        $alreadyIssued = count(static::registrationsWithCertificates($recipients->modelKeys()));
+        $toIssue = $recipients->count() - $alreadyIssued;
+
+        $lines = [
+            $event->title,
+            $registrations->count().' '.str('registration')->plural($registrations->count())
+                .($includeUnconfirmed ? ' (confirmed and unconfirmed)' : ' (confirmed only)'),
+        ];
+
+        if ($collapsed > 0) {
+            $lines[] = $collapsed.' duplicate '.str('registration')->plural($collapsed)
+                .' for the same email will be counted once';
+        }
+
+        if ($alreadyIssued > 0) {
+            $lines[] = $alreadyIssued.' already hold a certificate and will be skipped';
+        }
+
+        $lines[] = $toIssue > 0
+            ? 'Creates '.$toIssue.' '.str('certificate')->plural($toIssue).', each with its own credential ID and QR'
+            : 'Nothing left to issue';
+
+        $lines[] = 'No registration or session record is modified';
+
+        return $lines;
+    }
+
+    /**
+     * The attendees a batch would cover: the session's registrations, minus
+     * repeat sign-ups from the same person.
+     *
+     * @return EloquentCollection<int, Registration>
+     */
+    protected function bulkRecipients(int $eventId, bool $includeUnconfirmed): EloquentCollection
+    {
+        return static::deduplicate(static::sessionRegistrations($eventId, $includeUnconfirmed));
+    }
+
+    /**
+     * @return EloquentCollection<int, Registration>
+     */
+    protected static function sessionRegistrations(int $eventId, bool $includeUnconfirmed): EloquentCollection
+    {
+        return Registration::query()
+            ->where('event_id', $eventId)
+            ->unless($includeUnconfirmed, fn ($query) => $query->where('status', RegistrationStatus::Confirmed->value))
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * People sign up twice. Issuing the same person two certificates for one
+     * session is worse than missing an edge case, so repeat sign-ups on the
+     * same email collapse to a single recipient - preferring the confirmed
+     * registration, then the earliest.
+     *
+     * @param  EloquentCollection<int, Registration>  $registrations
+     * @return EloquentCollection<int, Registration>
+     */
+    protected static function deduplicate(EloquentCollection $registrations): EloquentCollection
+    {
+        $kept = $registrations
+            ->groupBy(fn (Registration $registration): string => mb_strtolower(trim((string) $registration->email)))
+            ->map(fn ($group) => $group
+                ->sortBy([
+                    fn (Registration $registration): int => $registration->status === RegistrationStatus::Confirmed ? 0 : 1,
+                    fn (Registration $registration): int => $registration->getKey(),
+                ])
+                ->first())
+            ->values()
+            ->all();
+
+        return new EloquentCollection($kept);
+    }
+
+    /**
+     * @param  array<int, int|string>  $registrationIds
+     * @return array<int, int>
+     */
+    protected static function registrationsWithCertificates(array $registrationIds): array
+    {
+        if ($registrationIds === []) {
+            return [];
+        }
+
+        return Certificate::query()
+            ->whereIn('registration_id', $registrationIds)
+            ->pluck('registration_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 
     /**
