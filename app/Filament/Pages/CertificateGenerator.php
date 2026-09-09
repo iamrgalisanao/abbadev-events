@@ -32,7 +32,7 @@ class CertificateGenerator extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAcademicCap;
 
-    protected static ?string $navigationLabel = 'E-certificates';
+    protected static ?string $navigationLabel = 'Certificate generator';
 
     protected static ?string $title = 'E-certificate generator';
 
@@ -49,7 +49,22 @@ class CertificateGenerator extends Page
 
     public function mount(): void
     {
-        $this->form->fill(static::defaultState());
+        $state = static::defaultState();
+
+        // Arriving from "Amend in generator" on an issued certificate: load
+        // it so re-issuing updates the record its QR already points at.
+        $record = Certificate::find(request()->integer('certificate'));
+
+        if ($record) {
+            $state = [
+                ...$state,
+                ...$record->toTemplateArray(),
+                'certificate_id' => $record->getKey(),
+                'registration_id' => $record->registration_id,
+            ];
+        }
+
+        $this->form->fill($state);
     }
 
     public function form(Schema $schema): Schema
