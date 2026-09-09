@@ -124,6 +124,34 @@ class CertificateBulkIssueTest extends TestCase
         );
     }
 
+    public function test_a_verified_payment_carries_an_unconfirmed_registration_into_the_batch(): void
+    {
+        $event = $this->event();
+        $paid = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com', RegistrationStatus::Pending->value);
+        $this->payment($paid, PaymentStatus::Verified);
+
+        // The default batch, without asking for unconfirmed registrations.
+        $this->generator($event)->call('bulkIssue', false);
+
+        $this->assertSame(1, Certificate::count());
+        $this->assertSame($paid->id, Certificate::first()->registration_id);
+    }
+
+    public function test_an_unpaid_unconfirmed_registration_is_still_left_out(): void
+    {
+        $event = $this->event();
+        $nothing = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com', RegistrationStatus::Pending->value);
+        $rejected = $this->attendee($event, 'John Lourence Lingad', 'lourence@example.com', RegistrationStatus::Pending->value);
+        $awaiting = $this->attendee($event, 'Mark Andrei Pascua', 'mark@example.com', RegistrationStatus::Pending->value);
+        $this->payment($rejected, PaymentStatus::Rejected);
+        $this->payment($awaiting, PaymentStatus::ForVerification);
+
+        $this->generator($event)->call('bulkIssue', false);
+
+        $this->assertSame(0, Certificate::count());
+        $this->assertNotNull($nothing->fresh());
+    }
+
     public function test_repeat_signups_on_one_email_get_a_single_certificate(): void
     {
         $event = $this->event();
@@ -263,7 +291,7 @@ class CertificateBulkIssueTest extends TestCase
             ->tap(fn (CertificateGenerator $page) => $page->data = ['event_id' => $event->id])
             ->bulkSummary(false));
 
-        $this->assertStringContainsString('3 registrations (confirmed only)', $summary);
+        $this->assertStringContainsString('3 registrations (confirmed, or with a verified payment)', $summary);
         $this->assertStringContainsString('1 duplicate registration for the same email will be counted once', $summary);
         $this->assertStringContainsString('Creates 2 certificates', $summary);
         $this->assertStringContainsString('No registration or session record is modified', $summary);

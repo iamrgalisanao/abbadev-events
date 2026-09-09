@@ -295,7 +295,7 @@ class CertificateGenerator extends Page
                 ->schema([
                     Toggle::make('include_unconfirmed')
                         ->label('Include registrations that are not confirmed')
-                        ->helperText('Off by default. Someone who never completed payment usually should not receive a certificate.')
+                        ->helperText('A registration with a verified payment is always included, whatever its status. Turn this on to also cover registrations that neither confirmed nor paid.')
                         ->live(),
                     TextEntry::make('summary')
                         ->label('What this will do')
@@ -464,7 +464,7 @@ class CertificateGenerator extends Page
         $lines = [
             $event->title,
             $registrations->count().' '.str('registration')->plural($registrations->count())
-                .($includeUnconfirmed ? ' (confirmed and unconfirmed)' : ' (confirmed only)'),
+                .($includeUnconfirmed ? ' (confirmed and unconfirmed)' : ' (confirmed, or with a verified payment)'),
         ];
 
         if ($collapsed > 0) {
@@ -504,7 +504,13 @@ class CertificateGenerator extends Page
         return Registration::query()
             ->with('payments')
             ->where('event_id', $eventId)
-            ->unless($includeUnconfirmed, fn ($query) => $query->where('status', RegistrationStatus::Confirmed->value))
+            // A verified payment is the stronger signal, so it carries a
+            // registration into the batch on its own. PaymentService::confirm()
+            // normally moves both together, but where they have drifted apart
+            // the money is what settles it.
+            ->unless($includeUnconfirmed, fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('status', RegistrationStatus::Confirmed->value)
+                ->orWhereHas('payments', fn ($payments) => $payments->where('status', PaymentStatus::Verified->value))))
             ->orderBy('name')
             ->get();
     }
