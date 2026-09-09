@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\RegistrationStatus;
 use App\Models\Certificate;
+use App\Models\Event;
 use App\Models\Registration;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -61,6 +63,7 @@ class CertificateGenerator extends Page
                 ...$record->toTemplateArray(),
                 'certificate_id' => $record->getKey(),
                 'registration_id' => $record->registration_id,
+                'event_id' => $record->registration?->event_id,
             ];
         }
 
@@ -73,9 +76,55 @@ class CertificateGenerator extends Page
             ->statePath('data')
             ->components([
                 Section::make('Recipient')
-                    ->description('Type the details, or pull them from a registration or an already-issued certificate.')
+                    ->description('Pick the session, then the attendee. Every field stays editable afterwards.')
                     ->columns(2)
                     ->schema([
+                        Select::make('event_id')
+                            ->label('Session')
+                            ->placeholder('Search a conducted session…')
+                            ->searchable()
+                            ->options(fn (): array => static::sessionOptions())
+                            ->getSearchResultsUsing(fn (string $search): array => static::sessionOptions($search))
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set): void {
+                                // The attendee list belongs to the old session, so drop it.
+                                $set('registration_id', null);
+
+                                $event = $state ? Event::find($state) : null;
+
+                                if (! $event) {
+                                    return;
+                                }
+
+                                $set('activity_title', $event->title);
+                                $set('activity_label', 'for participating in the '.strtolower((string) ($event->type ?: 'session')));
+                                $set('issued_on', $event->starts_at?->toDateString());
+                                $set('duration', $event->duration ?: null);
+                            })
+                            ->helperText('Sessions that have already taken place. Fills the session title, date and duration.'),
+                        Select::make('registration_id')
+                            ->label('Attendee')
+                            ->placeholder(fn (callable $get): string => filled($get('event_id'))
+                                ? 'Search an attendee…'
+                                : 'Pick a session first')
+                            ->searchable()
+                            ->options(fn (callable $get): array => static::attendeeOptions($get('event_id')))
+                            ->getSearchResultsUsing(fn (string $search, callable $get): array => static::attendeeOptions($get('event_id'), $search))
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set): void {
+                                $registration = $state ? Registration::find($state) : null;
+
+                                if ($registration) {
+                                    $set('recipient_name', $registration->name);
+                                }
+                            })
+                            ->helperText('Everyone registered for that session. Fills the recipient name.'),
+                        TextInput::make('recipient_name')
+                            ->label('Recipient name')
+                            ->required()
+                            ->maxLength(120)
+                            ->live(onBlur: true)
+                            ->columnSpanFull(),
                         Select::make('certificate_id')
                             ->label('Load an issued certificate')
                             ->placeholder('Search an issued certificate…')
@@ -84,7 +133,7 @@ class CertificateGenerator extends Page
                             ->getSearchResultsUsing(fn (string $search): array => static::certificateOptions($search))
                             ->live()
                             ->afterStateUpdated(function ($state, callable $set): void {
-                                $certificate = $state ? Certificate::find($state) : null;
+                                $certificate = $state ? Certificate::with('registration')->find($state) : null;
 
                                 if (! $certificate) {
                                     return;
@@ -95,58 +144,9 @@ class CertificateGenerator extends Page
                                 }
 
                                 $set('registration_id', $certificate->registration_id);
+                                $set('event_id', $certificate->registration?->event_id);
                             })
-                            ->helperText('Reprint or amend a certificate that has already been issued.')
-                            ->columnSpanFull(),
-                        Select::make('registration_id')
-                            ->label('Prefill from a registration')
-                            ->placeholder('Search a registrant…')
-                            ->searchable()
-                            ->options(fn (): array => Registration::query()
-                                ->with('event')
-                                ->latest('id')
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(fn (Registration $registration): array => [
-                                    $registration->id => "{$registration->name} — {$registration->registration_number}",
-                                ])
-                                ->all())
-                            ->getSearchResultsUsing(fn (string $search): array => Registration::query()
-                                ->with('event')
-                                ->where(fn ($query) => $query
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->orWhere('email', 'like', "%{$search}%")
-                                    ->orWhere('registration_number', 'like', "%{$search}%"))
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(fn (Registration $registration): array => [
-                                    $registration->id => "{$registration->name} — {$registration->registration_number}",
-                                ])
-                                ->all())
-                            ->live()
-                            ->afterStateUpdated(function ($state, callable $set): void {
-                                $registration = $state ? Registration::with('event')->find($state) : null;
-
-                                if (! $registration) {
-                                    return;
-                                }
-
-                                $set('recipient_name', $registration->name);
-
-                                if ($event = $registration->event) {
-                                    $set('activity_title', $event->title);
-                                    $set('activity_label', 'for participating in the '.strtolower((string) ($event->type ?: 'session')));
-                                    $set('issued_on', $event->starts_at?->toDateString());
-                                    $set('duration', $event->duration ?: null);
-                                }
-                            })
-                            ->helperText('Optional. Overwrites the name, session, date and duration below.')
-                            ->columnSpanFull(),
-                        TextInput::make('recipient_name')
-                            ->label('Recipient name')
-                            ->required()
-                            ->maxLength(120)
-                            ->live(onBlur: true)
+                            ->helperText('Reprint or amend a certificate that has already been issued. Overwrites everything above.')
                             ->columnSpanFull(),
                     ]),
 
@@ -340,6 +340,60 @@ class CertificateGenerator extends Page
     }
 
     /**
+     * Sessions that have already run. A certificate attests to attendance, so
+     * one for a session that has not happened yet would be issuing a claim
+     * about the future.
+     *
+     * @return array<int, string>
+     */
+    protected static function sessionOptions(?string $search = null): array
+    {
+        return Event::query()
+            ->where('starts_at', '<=', now())
+            ->when($search, fn ($query) => $query->where('title', 'like', "%{$search}%"))
+            ->orderByDesc('starts_at')
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (Event $event): array => [
+                $event->id => $event->title.' — '.($event->starts_at?->format('M j, Y') ?? 'no date'),
+            ])
+            ->all();
+    }
+
+    /**
+     * Everyone registered for a session. Registrations that never reached
+     * confirmed are flagged rather than hidden - someone can attend on a
+     * pending payment, and that is the admin's call, not this list's.
+     *
+     * @return array<int, string>
+     */
+    protected static function attendeeOptions(mixed $eventId, ?string $search = null): array
+    {
+        if (blank($eventId)) {
+            return [];
+        }
+
+        return Registration::query()
+            ->where('event_id', $eventId)
+            ->when($search, fn ($query) => $query
+                ->where(fn ($inner) => $inner
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('registration_number', 'like', "%{$search}%")))
+            ->orderBy('name')
+            ->limit(200)
+            ->get()
+            ->mapWithKeys(fn (Registration $registration): array => [
+                $registration->id => $registration->name.' — '.$registration->email.(
+                    $registration->status === RegistrationStatus::Confirmed
+                        ? ''
+                        : ' ('.$registration->status->getLabel().')'
+                ),
+            ])
+            ->all();
+    }
+
+    /**
      * @return array<int, string>
      */
     protected static function certificateOptions(?string $search = null): array
@@ -366,6 +420,7 @@ class CertificateGenerator extends Page
     {
         return [
             'certificate_id' => null,
+            'event_id' => null,
             'registration_id' => null,
             'recipient_name' => '',
             'certificate_title' => 'Certificate of Participation',
