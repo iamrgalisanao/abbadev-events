@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PaymentStatus;
 use App\Enums\RegistrationStatus;
 use App\Filament\Pages\CertificateGenerator;
 use App\Models\Certificate;
 use App\Models\Event;
+use App\Models\Payment;
 use App\Models\Registration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,6 +40,17 @@ class CertificateBulkIssueTest extends TestCase
             'duration' => '2 Hours',
             'is_active' => true,
             ...$overrides,
+        ]);
+    }
+
+    protected function payment(Registration $registration, PaymentStatus $status): Payment
+    {
+        return Payment::create([
+            'registration_id' => $registration->id,
+            'expected_amount' => 399,
+            'amount_submitted' => 399,
+            'reference_number' => fake()->unique()->numerify('##########'),
+            'status' => $status->value,
         ]);
     }
 
@@ -114,6 +127,7 @@ class CertificateBulkIssueTest extends TestCase
     public function test_repeat_signups_on_one_email_get_a_single_certificate(): void
     {
         $event = $this->event();
+        // Pending signs up first, so only the status rule can pick the winner.
         $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com', RegistrationStatus::Pending->value);
         $confirmed = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
 
@@ -122,6 +136,54 @@ class CertificateBulkIssueTest extends TestCase
         $this->assertSame(1, Certificate::count());
         // The confirmed row wins, so the certificate hangs off the real one.
         $this->assertSame($confirmed->id, Certificate::first()->registration_id);
+    }
+
+    public function test_the_registration_with_a_verified_payment_wins_a_duplicate(): void
+    {
+        $event = $this->event();
+
+        // Both rows reached confirmed, but only one has money checked against
+        // it. Without the payment rule the earlier row would have won.
+        $unpaid = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
+        $paid = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
+        $this->payment($unpaid, PaymentStatus::ForVerification);
+        $this->payment($paid, PaymentStatus::Verified);
+
+        $this->generator($event)->call('bulkIssue', false);
+
+        $this->assertSame(1, Certificate::count());
+        $this->assertSame($paid->id, Certificate::first()->registration_id);
+    }
+
+    public function test_a_verified_payment_outranks_a_confirmed_registration(): void
+    {
+        $event = $this->event();
+
+        $confirmedButUnpaid = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
+        $paidButPending = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com', RegistrationStatus::Pending->value);
+        $this->payment($paidButPending, PaymentStatus::Verified);
+
+        $this->generator($event)->call('bulkIssue', true);
+
+        $this->assertSame(1, Certificate::count());
+        $this->assertSame($paidButPending->id, Certificate::first()->registration_id);
+        $this->assertNotSame($confirmedButUnpaid->id, Certificate::first()->registration_id);
+    }
+
+    public function test_a_rejected_payment_does_not_win_a_duplicate(): void
+    {
+        $event = $this->event();
+
+        // The rejected row is the later sign-up, so if anything other than a
+        // verified payment jumped the queue it would win here.
+        $clean = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
+        $rejected = $this->attendee($event, 'Franz Jeric Borbo', 'franz@example.com');
+        $this->payment($rejected, PaymentStatus::Rejected);
+
+        $this->generator($event)->call('bulkIssue', false);
+
+        $this->assertSame(1, Certificate::count());
+        $this->assertSame($clean->id, Certificate::first()->registration_id);
     }
 
     public function test_a_second_run_tops_up_instead_of_reissuing(): void
