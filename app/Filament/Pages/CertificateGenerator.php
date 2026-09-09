@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Enums\RegistrationStatus;
 use App\Filament\Resources\Certificates\CertificateResource;
 use App\Models\Certificate;
@@ -501,6 +502,7 @@ class CertificateGenerator extends Page
     protected static function sessionRegistrations(int $eventId, bool $includeUnconfirmed): EloquentCollection
     {
         return Registration::query()
+            ->with('payments')
             ->where('event_id', $eventId)
             ->unless($includeUnconfirmed, fn ($query) => $query->where('status', RegistrationStatus::Confirmed->value))
             ->orderBy('name')
@@ -510,8 +512,13 @@ class CertificateGenerator extends Page
     /**
      * People sign up twice. Issuing the same person two certificates for one
      * session is worse than missing an edge case, so repeat sign-ups on the
-     * same email collapse to a single recipient - preferring the confirmed
-     * registration, then the earliest.
+     * same email collapse to a single recipient.
+     *
+     * A verified payment decides it: that is the row an admin actually checked
+     * against the GCash portal, so the certificate hangs off the registration
+     * the money is attached to. Registration status breaks the tie for free
+     * sessions, where there is no payment either way, and the earliest sign-up
+     * breaks it after that.
      *
      * @param  EloquentCollection<int, Registration>  $registrations
      * @return EloquentCollection<int, Registration>
@@ -520,16 +527,25 @@ class CertificateGenerator extends Page
     {
         $kept = $registrations
             ->groupBy(fn (Registration $registration): string => mb_strtolower(trim((string) $registration->email)))
+            // One composite key rather than sortBy's multi-comparison array:
+            // that form treats callables as comparators, not value extractors.
             ->map(fn ($group) => $group
-                ->sortBy([
-                    fn (Registration $registration): int => $registration->status === RegistrationStatus::Confirmed ? 0 : 1,
-                    fn (Registration $registration): int => $registration->getKey(),
+                ->sortBy(fn (Registration $registration): array => [
+                    static::hasVerifiedPayment($registration) ? 0 : 1,
+                    $registration->status === RegistrationStatus::Confirmed ? 0 : 1,
+                    $registration->getKey(),
                 ])
                 ->first())
             ->values()
             ->all();
 
         return new EloquentCollection($kept);
+    }
+
+    protected static function hasVerifiedPayment(Registration $registration): bool
+    {
+        return $registration->payments
+            ->contains(fn ($payment): bool => $payment->status === PaymentStatus::Verified);
     }
 
     /**
