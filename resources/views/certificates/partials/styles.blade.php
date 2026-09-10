@@ -211,6 +211,22 @@
             gap: 0.55cqw;
         }
 
+        .ecert-signature-mark {
+            /* Sits on the rule rather than above it, the way a signature
+               runs over a printed line. */
+            height: 4.4cqw;
+            width: auto;
+            max-width: 22cqw;
+            margin-bottom: -1.4cqw;
+            object-fit: contain;
+            /* Signatures are signed in dark ink, and this certificate is dark.
+               Inverting turns the ink light; screen then drops what inverting
+               made black — the paper of a scan — so only the strokes remain.
+               A transparent PNG passes through the same way. */
+            filter: invert(1);
+            mix-blend-mode: screen;
+        }
+
         .ecert-signature-rule {
             display: block;
             width: 100%;

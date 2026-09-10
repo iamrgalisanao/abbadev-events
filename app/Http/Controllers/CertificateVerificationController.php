@@ -6,6 +6,8 @@ use App\Models\Certificate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Public, unauthenticated landing pages for a scanned certificate QR code.
@@ -89,6 +91,24 @@ class CertificateVerificationController extends Controller
         }
 
         return view('certificates.download', ['certificate' => $certificate]);
+    }
+
+    /**
+     * Stream a signatory's e-signature. Public, because it is printed on a
+     * certificate anyone holding the credential can already see.
+     *
+     * Only the basename is used and it is resolved inside the signatures
+     * directory, so a crafted path cannot reach anything else on the disk.
+     */
+    public function signature(string $file): SymfonyResponse
+    {
+        $path = Certificate::SIGNATURE_DIRECTORY.'/'.basename($file);
+
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
     }
 
     protected function find(string $credential): ?Certificate

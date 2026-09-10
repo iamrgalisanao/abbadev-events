@@ -49,6 +49,7 @@
     // One badge sits in the signature row: the QR when there is a credential
     // to scan, otherwise the seal.
     $verificationUrl = $verificationUrl ?? null;
+    $signatureUrl = $signatureUrl ?? null;
     $showQr = (bool) ($c['show_qr'] ?? true) && filled($verificationUrl);
     $showSeal = ! $showQr && (bool) ($c['show_seal'] ?? true);
 
@@ -118,6 +119,9 @@
             <div class="ecert-signatures">
                 @if (filled($value('signatory_one_name')) || filled($value('signatory_one_role')))
                     <div class="ecert-signature">
+                        @if (filled($signatureUrl))
+                            <img class="ecert-signature-mark" src="{{ $signatureUrl }}" alt="" />
+                        @endif
                         <span class="ecert-signature-rule" aria-hidden="true"></span>
                         <p class="ecert-signature-name">{{ $value('signatory_one_name', ' ') }}</p>
                         <p class="ecert-signature-role">{{ $value('signatory_one_role') }}</p>

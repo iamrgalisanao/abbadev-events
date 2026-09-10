@@ -11,6 +11,7 @@ use App\Models\Registration;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -23,8 +24,10 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Fill-in-the-blanks e-certificate builder. Everything is typed by hand (or
@@ -126,7 +129,10 @@ class CertificateGenerator extends Page
                             ->helperText('Everyone registered for that session. Fills the recipient name.'),
                         TextInput::make('recipient_name')
                             ->label('Recipient name')
-                            ->required()
+                            // Not ->required(): a batch fills this per
+                            // attendee, and getState() validates. issue()
+                            // checks it instead.
+                            ->markAsRequired()
                             ->maxLength(120)
                             ->live(onBlur: true)
                             ->columnSpanFull(),
@@ -203,6 +209,18 @@ class CertificateGenerator extends Page
                             ->label('Role')
                             ->maxLength(80)
                             ->live(onBlur: true),
+                        FileUpload::make('signature_path')
+                            ->label('Signature')
+                            ->helperText('An e-signature or a scan of one, printed on the line above the name. Sign in dark ink on white or transparent: the certificate is dark, so the image is inverted to sit on it and any white paper drops away.')
+                            ->image()
+                            ->disk('local')
+                            ->directory(Certificate::SIGNATURE_DIRECTORY)
+                            ->visibility('private')
+                            ->maxSize(2048)
+                            ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+                            ->imagePreviewHeight('80')
+                            ->live()
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Credential')
@@ -324,6 +342,15 @@ class CertificateGenerator extends Page
     {
         $data = $this->form->getState();
 
+        if (blank($data['recipient_name'] ?? null)) {
+            Notification::make()
+                ->title('Give the certificate a recipient first')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $certificate = Certificate::updateOrCreate(
             ['credential_id' => $data['credential_id']],
             [
@@ -362,7 +389,12 @@ class CertificateGenerator extends Page
      */
     public function bulkIssue(bool $includeUnconfirmed = false): void
     {
-        $event = Event::find($this->data['event_id'] ?? null);
+        // Dehydrated rather than raw state: an uploaded signature is only
+        // written to disk, and reduced to a path, when the schema
+        // dehydrates. Raw state still holds the upload array.
+        $data = $this->form->getState();
+
+        $event = Event::find($data['event_id'] ?? null);
 
         if (! $event) {
             Notification::make()
@@ -374,7 +406,7 @@ class CertificateGenerator extends Page
         }
 
         $template = collect(Certificate::TEMPLATE_FIELDS)
-            ->mapWithKeys(fn (string $field): array => [$field => $this->data[$field] ?? null])
+            ->mapWithKeys(fn (string $field): array => [$field => $data[$field] ?? null])
             ->except(['credential_id', 'recipient_name'])
             ->all();
 
@@ -569,6 +601,25 @@ class CertificateGenerator extends Page
     }
 
     /**
+     * URL for whatever is currently in the signature field.
+     *
+     * Mid-edit the state is still a Livewire temporary file, so the preview
+     * shows that; once the certificate has been issued (or reloaded) the
+     * state is a stored path and it comes from the public signature route.
+     */
+    public function getSignatureUrl(): ?string
+    {
+        $state = $this->data['signature_path'] ?? null;
+        $file = is_array($state) ? Arr::first($state) : $state;
+
+        if ($file instanceof TemporaryUploadedFile) {
+            return $file->temporaryUrl();
+        }
+
+        return filled($file) ? route('certificates.signature', basename($file)) : null;
+    }
+
+    /**
      * The verification URL the preview's QR encodes. Derived from the credential
      * ID alone, so the QR is correct in the preview before the record is saved.
      */
@@ -671,6 +722,7 @@ class CertificateGenerator extends Page
             'body_text' => 'This certificate confirms attendance and participation in the above learning session and reflects engagement in professional development activities related to the stated topic.',
             'signatory_one_name' => '',
             'signatory_one_role' => 'Founder / Resource Speaker',
+            'signature_path' => null,
             // Kept in state so an older two-signatory certificate loaded for
             // reprint keeps its second signature; the form no longer sets one.
             'signatory_two_name' => '',

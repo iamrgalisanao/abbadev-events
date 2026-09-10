@@ -92,6 +92,7 @@
                 @include('certificates.partials.certificate', [
                     'c' => $this->data ?? [],
                     'verificationUrl' => $this->getVerificationUrl(),
+                    'signatureUrl' => $this->getSignatureUrl(),
                 ])
             </div>
         </div>
