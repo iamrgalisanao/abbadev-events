@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="78%">
+      <stop offset="0%" stop-color="#123B70"/>
+      <stop offset="52%" stop-color="#082B57"/>
+      <stop offset="100%" stop-color="#03162F"/>
+    </radialGradient>
+
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A5CFF"/>
+      <stop offset="35%" stop-color="#00C8FF"/>
+      <stop offset="58%" stop-color="#EAFBFF"/>
+      <stop offset="78%" stop-color="#00A9FF"/>
+      <stop offset="100%" stop-color="#154BFF"/>
+    </linearGradient>
+
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0F3C73" stop-opacity="0.98"/>
+      <stop offset="100%" stop-color="#071F3D" stop-opacity="0.98"/>
+    </linearGradient>
+
+    <clipPath id="leftClip">
+      <path d="M0,0 H330
+               C270,120 260,220 285,330
+               C315,455 260,560 185,690
+               C110,820 110,1000 175,1200
+               H0 Z"/>
+    </clipPath>
+
+    <clipPath id="rightClip">
+      <path d="M1600,0 H1270
+               C1330,120 1340,220 1315,330
+               C1285,455 1340,560 1415,690
+               C1490,820 1490,1000 1425,1200
+               H1600 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+
+  <path d="M0,0 H330
+           C270,120 260,220 285,330
+           C315,455 260,560 185,690
+           C110,820 110,1000 175,1200
+           H0 Z"
+        fill="url(#panel)"/>
+
+  <path d="M1600,0 H1270
+           C1330,120 1340,220 1315,330
+           C1285,455 1340,560 1415,690
+           C1490,820 1490,1000 1425,1200
+           H1600 Z"
+        fill="url(#panel)"/>
+
+  <g clip-path="url(#leftClip)" fill="none" stroke="#2D78FF" stroke-opacity="0.34" stroke-width="1.5">
+    <path d="M-60,10 C100,90 240,200 220,365 C198,545 60,670 55,920 C52,1040 95,1130 145,1210"/>
+    <path d="M-35,-15 C125,80 265,195 245,365 C223,545 85,680 80,920 C77,1040 120,1130 170,1210"/>
+    <path d="M-10,-40 C150,70 290,190 270,365 C248,545 110,690 105,920 C102,1040 145,1130 195,1210"/>
+    <path d="M15,-65 C175,60 315,185 295,365 C273,545 135,700 130,920 C127,1040 170,1130 220,1210"/>
+    <path d="M40,-90 C200,50 340,180 320,365 C298,545 160,710 155,920 C152,1040 195,1130 245,1210"/>
+    <path d="M65,-115 C225,40 365,175 345,365 C323,545 185,720 180,920 C177,1040 220,1130 270,1210"/>
+  </g>
+
+  <g clip-path="url(#rightClip)" fill="none" stroke="#2D78FF" stroke-opacity="0.34" stroke-width="1.5">
+    <path d="M1660,10 C1500,90 1360,200 1380,365 C1402,545 1540,670 1545,920 C1548,1040 1505,1130 1455,1210"/>
+    <path d="M1635,-15 C1475,80 1335,195 1355,365 C1377,545 1515,680 1520,920 C1523,1040 1480,1130 1430,1210"/>
+    <path d="M1610,-40 C1450,70 1310,190 1330,365 C1352,545 1490,690 1495,920 C1498,1040 1455,1130 1405,1210"/>
+    <path d="M1585,-65 C1425,60 1285,185 1305,365 C1327,545 1465,700 1470,920 C1473,1040 1430,1130 1380,1210"/>
+    <path d="M1560,-90 C1400,50 1260,180 1280,365 C1302,545 1440,710 1445,920 C1448,1040 1405,1130 1355,1210"/>
+    <path d="M1535,-115 C1375,40 1235,175 1255,365 C1277,545 1415,720 1420,920 C1423,1040 1380,1130 1330,1210"/>
+  </g>
+
+  <path d="M92,-10
+           C205,105 290,220 278,355
+           C267,485 212,565 155,680"
+        fill="none" stroke="url(#accent)" stroke-width="11" stroke-linecap="round"/>
+
+  <path d="M1508,-10
+           C1395,105 1310,220 1322,355
+           C1333,485 1388,565 1445,680"
+        fill="none" stroke="url(#accent)" stroke-width="11" stroke-linecap="round"/>
+
+  <path d="M165,1200
+           C112,1045 115,890 168,770
+           C207,682 251,610 302,545"
+        fill="none" stroke="url(#accent)" stroke-width="40" stroke-linecap="round"/>
+
+  <path d="M1435,1200
+           C1488,1045 1485,890 1432,770
+           C1393,682 1349,610 1298,545"
+        fill="none" stroke="url(#accent)" stroke-width="40" stroke-linecap="round"/>
+
+  <path d="M184,1200
+           C137,1035 139,900 186,790"
+        fill="none" stroke="#DDFBFF" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+
+  <path d="M1416,1200
+           C1463,1035 1461,900 1414,790"
+        fill="none" stroke="#DDFBFF" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -191,24 +191,16 @@ class CertificateGenerator extends Page
                             ->columnSpanFull(),
                     ]),
 
-                Section::make('Signatories')
-                    ->description('Leave a block blank to print a single signature.')
+                Section::make('Signatory')
+                    ->description('One signature, printed beside the verification QR.')
                     ->columns(2)
                     ->schema([
                         TextInput::make('signatory_one_name')
-                            ->label('Left signatory')
+                            ->label('Name')
                             ->maxLength(80)
                             ->live(onBlur: true),
                         TextInput::make('signatory_one_role')
-                            ->label('Left role')
-                            ->maxLength(80)
-                            ->live(onBlur: true),
-                        TextInput::make('signatory_two_name')
-                            ->label('Right signatory')
-                            ->maxLength(80)
-                            ->live(onBlur: true),
-                        TextInput::make('signatory_two_role')
-                            ->label('Right role')
+                            ->label('Role')
                             ->maxLength(80)
                             ->live(onBlur: true),
                     ]),
@@ -673,15 +665,17 @@ class CertificateGenerator extends Page
             'conducted_by' => 'conducted by ABBADev.',
             'body_text' => 'This certificate confirms attendance and participation in the above learning session and reflects engagement in professional development activities related to the stated topic.',
             'signatory_one_name' => '',
-            'signatory_one_role' => 'Resource Speaker',
+            'signatory_one_role' => 'Founder / Resource Speaker',
+            // Kept in state so an older two-signatory certificate loaded for
+            // reprint keeps its second signature; the form no longer sets one.
             'signatory_two_name' => '',
-            'signatory_two_role' => 'Founder / Program Lead',
+            'signatory_two_role' => '',
             'credential_id' => static::newCredentialId(),
             'issued_on' => now()->toDateString(),
             'duration' => '2 Hours',
             'footer_note' => 'Attendance or recognition only. Not a professional certification, license, or academic credential. Misuse is prohibited.',
             'organization_name' => 'ABBADEV',
-            'accent' => 'gold',
+            'accent' => 'blue',
             'seal_label' => 'CERTIFIED',
             'show_logo' => true,
             'show_qr' => true,
