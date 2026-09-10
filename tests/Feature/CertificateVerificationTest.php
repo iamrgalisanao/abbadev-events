@@ -19,6 +19,7 @@ class CertificateVerificationTest extends TestCase
             'certificate_title' => 'Certificate of Participation',
             'activity_title' => 'Web Dev 101: Go Live with Vercel',
             'organization_name' => 'ABBADEV',
+            'tagline' => 'IT SOLUTIONS',
             'issued_on' => '2026-08-28',
             'duration' => '2 Hours',
             ...$overrides,
@@ -44,6 +45,29 @@ class CertificateVerificationTest extends TestCase
             ->assertOk()
             ->assertSee('ecert-qr-svg', escape: false)
             ->assertSee('Scan to verify');
+    }
+
+    public function test_the_stored_tagline_prints_under_the_wordmark(): void
+    {
+        $certificate = $this->certificate();
+
+        $this->get("/verify/{$certificate->credential_id}")
+            ->assertOk()
+            ->assertSee('IT SOLUTIONS')
+            ->assertSee('<span class="ecert-tagline">', escape: false);
+    }
+
+    public function test_a_certificate_issued_without_a_tagline_prints_none(): void
+    {
+        // Older records predate the field, so the lockup has to cope with null.
+        $certificate = $this->certificate(['tagline' => null]);
+
+        $this->get("/verify/{$certificate->credential_id}")
+            ->assertOk()
+            // The class name still appears in the stylesheet, so this looks
+            // for the element rather than the string.
+            ->assertDontSee('<span class="ecert-tagline">', escape: false)
+            ->assertSee('ABBADEV');
     }
 
     public function test_an_unknown_credential_is_not_found(): void

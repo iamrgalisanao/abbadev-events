@@ -63,13 +63,20 @@
 
     <div class="ecert-body">
         <header class="ecert-head">
-            @if ($showLogo || filled($value('organization_name')))
+            @if ($showLogo || filled($value('organization_name')) || filled($value('tagline')))
                 <div class="ecert-brand">
                     @if ($showLogo)
                         <img class="ecert-logo" src="{{ asset('images/abbadev-logo.png') }}" alt="" />
                     @endif
-                    @if (filled($value('organization_name')))
-                        <span class="ecert-wordmark">{{ $value('organization_name') }}</span>
+                    @if (filled($value('organization_name')) || filled($value('tagline')))
+                        <span class="ecert-lockup">
+                            @if (filled($value('organization_name')))
+                                <span class="ecert-wordmark">{{ $value('organization_name') }}</span>
+                            @endif
+                            @if (filled($value('tagline')))
+                                <span class="ecert-tagline">{{ $value('tagline') }}</span>
+                            @endif
+                        </span>
                     @endif
                 </div>
             @endif
