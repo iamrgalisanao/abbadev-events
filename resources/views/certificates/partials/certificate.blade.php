@@ -50,6 +50,8 @@
     // to scan, otherwise the seal.
     $verificationUrl = $verificationUrl ?? null;
     $signatureUrl = $signatureUrl ?? null;
+    $artUrl = $artUrl ?? asset('images/abbadev_certificate_background.svg');
+    $logoUrl = $logoUrl ?? asset('images/abbadev-logo.png');
 
     // The signature floats in a fixed-height slot, so resizing or nudging
     // it never moves the name and role underneath.
@@ -68,14 +70,14 @@
     data-accent="{{ $c['accent'] ?? 'blue' }}"
     style="--ecert-name-size: {{ $nameSize }}; --ecert-title-size: {{ $titleSize }}; --ecert-activity-size: {{ $activitySize }};"
 >
-    <img class="ecert-art" src="{{ asset('images/abbadev_certificate_background.svg') }}" alt="" />
+    <img class="ecert-art" src="{{ $artUrl }}" alt="" />
 
     <div class="ecert-body">
         <header class="ecert-head">
             @if ($showLogo || filled($value('organization_name')) || filled($value('tagline')))
                 <div class="ecert-brand">
                     @if ($showLogo)
-                        <img class="ecert-logo" src="{{ asset('images/abbadev-logo.png') }}" alt="" />
+                        <img class="ecert-logo" src="{{ $logoUrl }}" alt="" />
                     @endif
                     @if (filled($value('organization_name')) || filled($value('tagline')))
                         <span class="ecert-lockup">

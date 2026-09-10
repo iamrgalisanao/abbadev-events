@@ -135,6 +135,37 @@ class CertificateSignatureTest extends TestCase
             ->assertSee('Rommel Galisanao');
     }
 
+    public function test_the_download_view_embeds_its_images_rather_than_linking_them(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put(Certificate::SIGNATURE_DIRECTORY.'/sig.png', 'not-really-a-png');
+
+        $certificate = $this->certificate([
+            'signature_path' => Certificate::SIGNATURE_DIRECTORY.'/sig.png',
+        ]);
+
+        $response = $this->get("/verify/{$certificate->credential_id}/download")->assertOk();
+        $html = $response->getContent();
+
+        // A page that exists to be rasterised should not depend on fetching
+        // anything at the moment the print job runs.
+        $this->assertStringContainsString('src="data:image/svg+xml;base64,', $html);
+        $this->assertStringContainsString('src="data:image/png;base64,', $html);
+        $this->assertStringNotContainsString('src="'.asset('images/abbadev-logo.png'), $html);
+        $this->assertStringNotContainsString(route('certificates.signature', 'sig.png'), $html);
+    }
+
+    public function test_the_verification_page_still_links_its_images(): void
+    {
+        // Only the print view embeds; the public page keeps cacheable files.
+        $certificate = $this->certificate();
+
+        $this->get("/verify/{$certificate->credential_id}")
+            ->assertOk()
+            ->assertSee(asset('images/abbadev_certificate_background.svg'), escape: false)
+            ->assertDontSee('src="data:image/png;base64,', escape: false);
+    }
+
     public function test_the_signature_route_streams_the_file(): void
     {
         Storage::fake('local');

@@ -100,10 +100,11 @@
 
     @script
         <script>
-            // Printing straight from the admin layout would carry the sidebar and
-            // form onto the page, so a clone of the certificate is lifted into a
-            // body-level portal for the duration of the print job. This runs for
-            // the toolbar button and for the browser's own Ctrl/Cmd+P.
+            // Printing straight from the admin layout would carry the sidebar
+            // and form onto the page, so the certificate is lifted into a
+            // body-level portal for the duration of the print job and put back
+            // afterwards. This runs for the toolbar button and for the browser's
+            // own Ctrl/Cmd+P.
             const portalId = 'ecert-print-portal'
 
             if (! document.getElementById(portalId)) {
@@ -115,44 +116,42 @@
             if (! window.ecertPrintBound) {
                 window.ecertPrintBound = true
 
+                let moved = null
+                let placeholder = null
+
+                // The certificate is moved into the portal, not copied into it.
+                // A copy made inside beforeprint is a set of brand-new nodes,
+                // and its images have to load and decode before Chrome takes the
+                // print snapshot - which they lose the race to, so every <img>
+                // came out blank while the inline-SVG QR beside them printed
+                // fine. Moving the nodes that are already painted avoids the
+                // decode entirely, and with only one copy in the document there
+                // are no duplicate SVG ids to reconcile either.
                 window.addEventListener('beforeprint', () => {
                     const source = document.querySelector('[data-ecert-source]')
                     const portal = document.getElementById(portalId)
 
-                    if (! source || ! portal) {
+                    if (! source || ! portal || moved) {
                         return
                     }
 
-                    const clone = source.cloneNode(true)
+                    placeholder = document.createComment('ecert-print-placeholder')
+                    source.parentNode.insertBefore(placeholder, source)
+                    portal.appendChild(source)
+                    moved = source
 
-                    // The clone carries a second copy of the certificate's SVG
-                    // ids. url(#...) resolves to the first match in the
-                    // document, which is the hidden original, so the ornament
-                    // would paint as nothing. Namespace the copy's own ids and
-                    // repoint its references at them.
-                    const suffix = '-print'
-
-                    clone.querySelectorAll('[id]').forEach((element) => {
-                        element.id = element.id + suffix
-                    })
-
-                    clone.querySelectorAll('*').forEach((element) => {
-                        Array.from(element.attributes).forEach((attribute) => {
-                            if (attribute.value.includes('url(#')) {
-                                element.setAttribute(
-                                    attribute.name,
-                                    attribute.value.replace(/url\(#([^)]+)\)/g, 'url(#$1' + suffix + ')'),
-                                )
-                            }
-                        })
-                    })
-
-                    portal.replaceChildren(clone)
                     document.documentElement.classList.add('ecert-printing')
                 })
 
                 window.addEventListener('afterprint', () => {
-                    document.getElementById(portalId)?.replaceChildren()
+                    if (moved && placeholder && placeholder.parentNode) {
+                        placeholder.parentNode.insertBefore(moved, placeholder)
+                        placeholder.remove()
+                    }
+
+                    moved = null
+                    placeholder = null
+
                     document.documentElement.classList.remove('ecert-printing')
                 })
             }
