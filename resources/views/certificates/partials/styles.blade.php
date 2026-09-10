@@ -205,19 +205,23 @@
 
         .ecert-signature {
             display: flex;
-            width: 26cqw;
+            width: 30cqw;
             flex-direction: column;
             align-items: center;
             gap: 0.55cqw;
         }
 
         .ecert-signature-mark {
-            /* Sits on the rule rather than above it, the way a signature
+            /* Sized from the width, not the height: a signature is wide and
+               short, and sizing it by height left it a fraction of the line it
+               is meant to sit across. 80% of the rule, with the height capped
+               so an unusually square upload cannot push the footer down.
+               The negative margin drops it onto the rule, the way a signature
                runs over a printed line. */
-            height: 4.4cqw;
-            width: auto;
-            max-width: 22cqw;
-            margin-bottom: -1.4cqw;
+            width: 80%;
+            height: auto;
+            max-height: 9cqw;
+            margin-bottom: -1.2cqw;
             object-fit: contain;
             /* Signatures are signed in dark ink, and this certificate is dark.
                Inverting turns the ink light; screen then drops what inverting
