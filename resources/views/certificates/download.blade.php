@@ -97,10 +97,25 @@
     </div>
 
     <div class="dl-stage">
+        @php
+            // Embedded rather than linked: this page exists to be rasterised
+            // into a PDF, and a linked image has to still be fetchable and
+            // decoded at the moment the print job runs. The saved file also
+            // then carries its own pixels, so it survives being emailed on.
+            $inline = fn (?string $path): ?string => \App\Support\InlineAsset::dataUri($path);
+            $signaturePath = filled($certificate->signature_path)
+                ? \Illuminate\Support\Facades\Storage::disk('local')->path($certificate->signature_path)
+                : null;
+        @endphp
+
         @include('certificates.partials.certificate', [
             'c' => $certificate->toTemplateArray(),
             'verificationUrl' => $certificate->verificationUrl(),
-            'signatureUrl' => $certificate->signatureUrl(),
+            'signatureUrl' => $inline($signaturePath) ?? $certificate->signatureUrl(),
+            'artUrl' => $inline(public_path('images/abbadev_certificate_background.svg'))
+                ?? asset('images/abbadev_certificate_background.svg'),
+            'logoUrl' => $inline(public_path('images/abbadev-logo.png'))
+                ?? asset('images/abbadev-logo.png'),
         ])
     </div>
 
