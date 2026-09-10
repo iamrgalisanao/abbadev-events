@@ -27,3 +27,6 @@ Homestead.yaml
 Thumbs.db
 /database/*.sqlite*
 /.claude
+
+# Signature images are uploaded through the admin, never committed.
+/public/images/signature*
