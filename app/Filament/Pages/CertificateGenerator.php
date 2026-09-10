@@ -242,6 +242,11 @@ class CertificateGenerator extends Page
                             ->label('Wordmark')
                             ->maxLength(40)
                             ->live(onBlur: true),
+                        TextInput::make('tagline')
+                            ->label('Tagline')
+                            ->maxLength(40)
+                            ->helperText('Printed under the wordmark. Leave blank to omit it.')
+                            ->live(onBlur: true),
                         Select::make('accent')
                             ->label('Accent')
                             ->options([
@@ -675,6 +680,7 @@ class CertificateGenerator extends Page
             'duration' => '2 Hours',
             'footer_note' => 'Attendance or recognition only. Not a professional certification, license, or academic credential. Misuse is prohibited.',
             'organization_name' => 'ABBADEV',
+            'tagline' => 'IT SOLUTIONS',
             'accent' => 'blue',
             'seal_label' => 'CERTIFIED',
             'show_logo' => true,

@@ -96,12 +96,31 @@
             width: auto;
         }
 
+        .ecert-lockup {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5cqw;
+        }
+
         .ecert-wordmark {
             font-size: 2.3cqw;
             font-weight: 800;
             letter-spacing: 0.2em;
             line-height: 1;
+            /* The trailing letter-space would push the word off-centre against
+               the tagline below it. */
+            text-indent: 0.2em;
             color: var(--ecert-paper);
+        }
+
+        .ecert-tagline {
+            font-size: 0.92cqw;
+            font-weight: 600;
+            letter-spacing: 0.42em;
+            line-height: 1;
+            text-indent: 0.42em;
+            color: var(--ecert-accent-2);
         }
 
         .ecert-title {
