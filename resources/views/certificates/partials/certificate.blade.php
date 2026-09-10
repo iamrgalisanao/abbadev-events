@@ -9,7 +9,7 @@
 
     // The three headline lines are the only copy that can break the layout, so
     // each steps down through fixed sizes to stay inside the 66cqw safe area
-    // between the gold sweeps instead of wrapping or colliding with them.
+    // between the artwork's swoops instead of wrapping or colliding with them.
     $nameLength = mb_strlen($recipient);
     $nameSize = match (true) {
         $nameLength <= 14 => '7cqw',
@@ -46,53 +46,20 @@
     $showLogo = (bool) ($c['show_logo'] ?? true);
     $sealYear = $issuedOn?->format('Y') ?? now()->format('Y');
 
-    // The centre cell between the two signatures holds one badge: the QR when
-    // there is a credential to scan, otherwise the seal.
+    // One badge sits in the signature row: the QR when there is a credential
+    // to scan, otherwise the seal.
     $verificationUrl = $verificationUrl ?? null;
     $showQr = (bool) ($c['show_qr'] ?? true) && filled($verificationUrl);
     $showSeal = ! $showQr && (bool) ($c['show_seal'] ?? true);
 
-    // Drawn once on the left, then echoed again mirrored onto the right edge.
-    $ornament = <<<'SVG'
-        <path d="M0,0 H54 C18,60 18,150 64,210 H0 Z" fill="url(#ecertPetal)" opacity="0.9" />
-        <path d="M0,0 H54 C18,60 18,150 64,210 H0 Z" fill="url(#ecertGrain)" />
-        <path d="M0,0 H28 C2,62 4,150 34,210 H0 Z" fill="var(--ecert-navy-1)" opacity="0.85" />
-        <path d="M62,0 C26,60 26,150 72,210 L64,210 C18,150 18,60 54,0 Z" fill="url(#ecertSweep)" />
-        <path d="M70,0 C34,60 34,150 80,210" fill="none" stroke="url(#ecertSweep)" stroke-width="0.6" opacity="0.45" />
-        <path d="M76,0 C40,60 40,150 86,210" fill="none" stroke="url(#ecertSweep)" stroke-width="0.25" opacity="0.28" />
-        SVG;
 @endphp
 
 <div
     class="ecert-frame"
-    data-accent="{{ $c['accent'] ?? 'gold' }}"
+    data-accent="{{ $c['accent'] ?? 'blue' }}"
     style="--ecert-name-size: {{ $nameSize }}; --ecert-title-size: {{ $titleSize }}; --ecert-activity-size: {{ $activitySize }};"
 >
-    <svg class="ecert-art" viewBox="0 0 297 210" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <defs>
-            <linearGradient id="ecertSweep" x1="0" y1="0" x2="0.9" y2="1">
-                <stop offset="0" stop-color="var(--ecert-accent-1)" />
-                <stop offset="0.42" stop-color="var(--ecert-accent-3)" />
-                <stop offset="0.7" stop-color="var(--ecert-accent-2)" />
-                <stop offset="1" stop-color="var(--ecert-accent-1)" />
-            </linearGradient>
-            <linearGradient id="ecertPetal" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="var(--ecert-navy-2)" />
-                <stop offset="1" stop-color="var(--ecert-navy-0)" />
-            </linearGradient>
-            <pattern id="ecertGrain" width="1.9" height="4" patternUnits="userSpaceOnUse">
-                <rect width="0.3" height="4" fill="var(--ecert-paper)" opacity="0.13" />
-            </pattern>
-        </defs>
-
-        <g>{!! $ornament !!}</g>
-        <g transform="translate(297,0) scale(-1,1)">{!! $ornament !!}</g>
-
-        <rect
-            x="9.5" y="8" width="278" height="194" rx="2"
-            fill="none" stroke="url(#ecertSweep)" stroke-width="0.35" opacity="0.55"
-        />
-    </svg>
+    <img class="ecert-art" src="{{ asset('images/abbadev_certificate_background.svg') }}" alt="" />
 
     <div class="ecert-body">
         <header class="ecert-head">
@@ -139,35 +106,35 @@
         </div>
 
         <footer class="ecert-foot">
-            {{-- Always a three-cell row so the badge stays centred whether one,
-                 two, or no signatories are filled in. --}}
+            {{-- Centred row: the badge and whichever signatories are filled
+                 in sit together, so one signatory is not left off-axis. --}}
             <div class="ecert-signatures">
-                <div class="ecert-signature">
-                    @if (filled($value('signatory_one_name')) || filled($value('signatory_one_role')))
+                @if (filled($value('signatory_one_name')) || filled($value('signatory_one_role')))
+                    <div class="ecert-signature">
                         <span class="ecert-signature-rule" aria-hidden="true"></span>
                         <p class="ecert-signature-name">{{ $value('signatory_one_name', ' ') }}</p>
                         <p class="ecert-signature-role">{{ $value('signatory_one_role') }}</p>
-                    @endif
-                </div>
+                    </div>
+                @endif
 
-                <div class="ecert-seal-cell">
-                    @if ($showQr)
-                        @include('certificates.partials.qr', ['url' => $verificationUrl])
-                    @elseif ($showSeal)
-                        @include('certificates.partials.seal', [
-                            'label' => $value('seal_label', 'CERTIFIED'),
-                            'year' => $sealYear,
-                        ])
-                    @endif
-                </div>
+                @if ($showQr)
+                    @include('certificates.partials.qr', ['url' => $verificationUrl])
+                @elseif ($showSeal)
+                    @include('certificates.partials.seal', [
+                        'label' => $value('seal_label', 'CERTIFIED'),
+                        'year' => $sealYear,
+                    ])
+                @endif
 
-                <div class="ecert-signature">
-                    @if (filled($value('signatory_two_name')) || filled($value('signatory_two_role')))
+                {{-- Certificates issued back when the template carried two
+                     signatories still render both, exactly as they were. --}}
+                @if (filled($value('signatory_two_name')) || filled($value('signatory_two_role')))
+                    <div class="ecert-signature">
                         <span class="ecert-signature-rule" aria-hidden="true"></span>
                         <p class="ecert-signature-name">{{ $value('signatory_two_name', ' ') }}</p>
                         <p class="ecert-signature-role">{{ $value('signatory_two_role') }}</p>
-                    @endif
-                </div>
+                    </div>
+                @endif
             </div>
 
             @if ($meta->isNotEmpty())

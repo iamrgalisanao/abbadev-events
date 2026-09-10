@@ -25,12 +25,21 @@
             aspect-ratio: 297 / 210;
             overflow: hidden;
             border-radius: 6px;
-            background: radial-gradient(125% 95% at 50% 0%, var(--ecert-navy-1), var(--ecert-navy-0) 64%);
+            background: var(--ecert-navy-0);
             color: var(--ecert-paper);
             font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
             box-shadow: 0 26px 70px rgb(0 0 0 / 0.35);
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+        }
+
+        /* Text, rules, the QR ring and the seal. The two stops match the
+           background artwork's own accent gradient so the type sits on the
+           same palette as the swoops behind it. */
+        .ecert-frame[data-accent='blue'] {
+            --ecert-accent-1: #154bff;
+            --ecert-accent-2: #00c8ff;
+            --ecert-accent-3: #eafbff;
         }
 
         .ecert-frame[data-accent='gold'] {
@@ -39,17 +48,16 @@
             --ecert-accent-3: #f7e8b8;
         }
 
-        .ecert-frame[data-accent='blue'] {
-            --ecert-accent-1: oklch(42% 0.15 258);
-            --ecert-accent-2: oklch(64% 0.17 258);
-            --ecert-accent-3: oklch(89% 0.07 258);
-        }
-
         .ecert-art {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
+            /* The artwork is 4:3 and the sheet is A4 landscape, so it fills the
+               width and loses a sliver top and bottom where the swoops already
+               run off the canvas. */
+            object-fit: cover;
+            object-position: center;
         }
 
         .ecert-body {
@@ -104,9 +112,12 @@
             line-height: 1.1;
             text-transform: uppercase;
             color: var(--ecert-accent-3);
+            /* Skips accent-1: the darkest stop is the artwork's own deep blue,
+               which loses contrast against the ground when it lands on a
+               leading letter. */
             background: linear-gradient(
                 100deg,
-                var(--ecert-accent-1) 0%,
+                var(--ecert-accent-2) 0%,
                 var(--ecert-accent-3) 34%,
                 var(--ecert-accent-2) 62%,
                 var(--ecert-accent-3) 100%
@@ -166,15 +177,16 @@
         }
 
         .ecert-signatures {
-            display: grid;
+            display: flex;
             width: 100%;
-            grid-template-columns: 1fr auto 1fr;
             align-items: end;
-            gap: 3cqw;
+            justify-content: center;
+            gap: 7cqw;
         }
 
         .ecert-signature {
             display: flex;
+            width: 26cqw;
             flex-direction: column;
             align-items: center;
             gap: 0.55cqw;
@@ -183,7 +195,6 @@
         .ecert-signature-rule {
             display: block;
             width: 100%;
-            max-width: 24cqw;
             height: 0.18cqw;
             margin-bottom: 0.7cqw;
             background: linear-gradient(

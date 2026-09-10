@@ -49,8 +49,13 @@ class CertificateInfolist
                         TextEntry::make('activity_title')->label('Session')->placeholder('—'),
                         TextEntry::make('issued_on')->label('Session date')->date('F j, Y')->placeholder('—'),
                         TextEntry::make('duration')->label('Duration')->placeholder('—'),
-                        TextEntry::make('signatory_one_name')->label('Left signatory')->placeholder('—'),
-                        TextEntry::make('signatory_two_name')->label('Right signatory')->placeholder('—'),
+                        TextEntry::make('signatory_one_name')->label('Signatory')->placeholder('—'),
+                        // Only set on certificates issued while the template
+                        // carried two signatures.
+                        TextEntry::make('signatory_two_name')
+                            ->label('Second signatory')
+                            ->placeholder('—')
+                            ->visible(fn ($record) => filled($record->signatory_two_name)),
                     ]),
 
                 Section::make('Issuance')
