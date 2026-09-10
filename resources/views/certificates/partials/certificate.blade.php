@@ -50,6 +50,14 @@
     // to scan, otherwise the seal.
     $verificationUrl = $verificationUrl ?? null;
     $signatureUrl = $signatureUrl ?? null;
+
+    // The signature floats in a fixed-height slot, so resizing or nudging
+    // it never moves the name and role underneath.
+    $signatureStyle = collect([
+        '--ecert-sig-scale: '.((int) ($c['signature_scale'] ?? 80)).'%',
+        '--ecert-sig-x: '.((int) ($c['signature_offset_x'] ?? 0)).'%',
+        '--ecert-sig-y: '.((int) ($c['signature_offset_y'] ?? 0)).'%',
+    ])->implode('; ');
     $showQr = (bool) ($c['show_qr'] ?? true) && filled($verificationUrl);
     $showSeal = ! $showQr && (bool) ($c['show_seal'] ?? true);
 
@@ -120,7 +128,14 @@
                 @if (filled($value('signatory_one_name')) || filled($value('signatory_one_role')))
                     <div class="ecert-signature">
                         @if (filled($signatureUrl))
-                            <img class="ecert-signature-mark" src="{{ $signatureUrl }}" alt="" />
+                            <span class="ecert-signature-slot">
+                                <img
+                                    class="ecert-signature-mark"
+                                    src="{{ $signatureUrl }}"
+                                    style="{{ $signatureStyle }}"
+                                    alt=""
+                                />
+                            </span>
                         @endif
                         <span class="ecert-signature-rule" aria-hidden="true"></span>
                         <p class="ecert-signature-name">{{ $value('signatory_one_name', ' ') }}</p>

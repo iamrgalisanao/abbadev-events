@@ -68,6 +68,63 @@ class CertificateSignatureTest extends TestCase
             ->assertSee(route('certificates.signature', 'sig.png'), escape: false);
     }
 
+    public function test_the_stored_placement_reaches_the_certificate(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put(Certificate::SIGNATURE_DIRECTORY.'/sig.png', 'not-really-a-png');
+
+        $certificate = $this->certificate([
+            'signature_path' => Certificate::SIGNATURE_DIRECTORY.'/sig.png',
+            'signature_scale' => 120,
+            'signature_offset_x' => -14,
+            'signature_offset_y' => 8,
+        ]);
+
+        $this->get("/verify/{$certificate->credential_id}")
+            ->assertOk()
+            ->assertSee('--ecert-sig-scale: 120%', escape: false)
+            ->assertSee('--ecert-sig-x: -14%', escape: false)
+            ->assertSee('--ecert-sig-y: 8%', escape: false);
+    }
+
+    public function test_a_certificate_issued_before_the_placement_fields_renders_where_it_always_did(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put(Certificate::SIGNATURE_DIRECTORY.'/sig.png', 'not-really-a-png');
+
+        // Null placement is what an older row carries.
+        $certificate = $this->certificate([
+            'signature_path' => Certificate::SIGNATURE_DIRECTORY.'/sig.png',
+            'signature_scale' => null,
+            'signature_offset_x' => null,
+            'signature_offset_y' => null,
+        ]);
+
+        $this->get("/verify/{$certificate->credential_id}")
+            ->assertOk()
+            ->assertSee('--ecert-sig-scale: 80%', escape: false)
+            ->assertSee('--ecert-sig-x: 0%', escape: false)
+            ->assertSee('--ecert-sig-y: 0%', escape: false);
+    }
+
+    public function test_placement_survives_issuing(): void
+    {
+        Storage::fake('local');
+
+        Livewire::actingAs($this->admin())
+            ->test(CertificateGenerator::class)
+            ->set('data.recipient_name', 'Raizel D. Galisanao')
+            ->set('data.signature_path', [UploadedFile::fake()->image('signature.png')])
+            ->set('data.signature_scale', 135)
+            ->set('data.signature_offset_y', -20)
+            ->call('issue');
+
+        $certificate = Certificate::sole();
+
+        $this->assertSame(135, $certificate->signature_scale);
+        $this->assertSame(-20, $certificate->signature_offset_y);
+    }
+
     public function test_a_certificate_without_a_signature_prints_none(): void
     {
         $certificate = $this->certificate();

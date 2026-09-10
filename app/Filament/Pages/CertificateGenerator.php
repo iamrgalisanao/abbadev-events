@@ -13,6 +13,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Slider;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -221,6 +222,26 @@ class CertificateGenerator extends Page
                             ->imagePreviewHeight('80')
                             ->live()
                             ->columnSpanFull(),
+                        Slider::make('signature_scale')
+                            ->label('Signature size')
+                            ->helperText('Width as a percentage of the line it sits on.')
+                            ->range(20, 160)
+                            ->step(5)
+                            ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                            ->live(onBlur: true)
+                            ->columnSpanFull(),
+                        Slider::make('signature_offset_x')
+                            ->label('Nudge left / right')
+                            ->range(-60, 60)
+                            ->step(2)
+                            ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                            ->live(onBlur: true),
+                        Slider::make('signature_offset_y')
+                            ->label('Nudge up / down')
+                            ->range(-60, 60)
+                            ->step(2)
+                            ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                            ->live(onBlur: true),
                     ]),
 
                 Section::make('Credential')
@@ -723,6 +744,9 @@ class CertificateGenerator extends Page
             'signatory_one_name' => '',
             'signatory_one_role' => 'Founder / Resource Speaker',
             'signature_path' => null,
+            'signature_scale' => 80,
+            'signature_offset_x' => 0,
+            'signature_offset_y' => 0,
             // Kept in state so an older two-signatory certificate loaded for
             // reprint keeps its second signature; the form no longer sets one.
             'signatory_two_name' => '',
