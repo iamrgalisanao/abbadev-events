@@ -211,18 +211,31 @@
             gap: 0.55cqw;
         }
 
+        /* A fixed-height placeholder above the rule. The signature is absolutely
+           positioned inside it and painted over everything around it, so it can
+           be sized and nudged into alignment without shifting the name, the
+           role, or anything else in the footer. */
+        .ecert-signature-slot {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 6cqw;
+        }
+
         .ecert-signature-mark {
-            /* Sized from the width, not the height: a signature is wide and
-               short, and sizing it by height left it a fraction of the line it
-               is meant to sit across. 80% of the rule, with the height capped
-               so an unusually square upload cannot push the footer down.
-               The negative margin drops it onto the rule, the way a signature
-               runs over a printed line. */
-            width: 80%;
+            position: absolute;
+            left: 50%;
+            /* Resting on the rule, the way a signature runs over a printed
+               line. The nudges are percentages of the image itself, so moving
+               it feels the same at any size. */
+            bottom: -1.2cqw;
+            width: var(--ecert-sig-scale, 80%);
             height: auto;
-            max-height: 9cqw;
-            margin-bottom: -1.2cqw;
-            object-fit: contain;
+            z-index: 2;
+            transform: translate(
+                calc(-50% + var(--ecert-sig-x, 0%)),
+                var(--ecert-sig-y, 0%)
+            );
             /* Signatures are signed in dark ink, and this certificate is dark.
                Inverting turns the ink light; screen then drops what inverting
                made black — the paper of a scan — so only the strokes remain.
