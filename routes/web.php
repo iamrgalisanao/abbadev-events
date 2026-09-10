@@ -30,3 +30,10 @@ Route::prefix('verify')
         Route::get('/{credential}/checks', [CertificateVerificationController::class, 'checks'])->name('checks');
         Route::get('/{credential}/download', [CertificateVerificationController::class, 'download'])->name('download');
     });
+
+// Signature images are shared across certificates, so they hang off their own
+// path rather than a credential's.
+Route::get('/certificate-signature/{file}', [CertificateVerificationController::class, 'signature'])
+    ->where('file', '[A-Za-z0-9._-]+')
+    ->middleware('throttle:120,1')
+    ->name('certificates.signature');

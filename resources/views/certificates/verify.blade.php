@@ -207,6 +207,7 @@
             @include('certificates.partials.certificate', [
                 'c' => $certificate->toTemplateArray(),
                 'verificationUrl' => $certificate->verificationUrl(),
+                'signatureUrl' => $certificate->signatureUrl(),
             ])
         </div>
 

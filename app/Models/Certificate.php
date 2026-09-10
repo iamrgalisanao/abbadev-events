@@ -19,6 +19,7 @@ class Certificate extends Model
         'body_text',
         'signatory_one_name',
         'signatory_one_role',
+        'signature_path',
         'signatory_two_name',
         'signatory_two_role',
         'issued_on',
@@ -46,6 +47,11 @@ class Certificate extends Model
     ];
 
     /**
+     * Where signature uploads live on the private disk.
+     */
+    public const SIGNATURE_DIRECTORY = 'certificate-signatures';
+
+    /**
      * The fields the certificate template reads. Keeping this list in one place
      * means the admin preview and the public verification page render from the
      * same shape, whether the source is an unsaved form or a stored record.
@@ -63,6 +69,7 @@ class Certificate extends Model
         'body_text',
         'signatory_one_name',
         'signatory_one_role',
+        'signature_path',
         'signatory_two_name',
         'signatory_two_role',
         'issued_on',
@@ -95,6 +102,18 @@ class Certificate extends Model
     public function verificationUrl(): string
     {
         return route('certificates.verify', $this->credential_id);
+    }
+
+    /**
+     * Public URL for the signatory's e-signature, or null when none was
+     * uploaded. Signatures live on the private disk and are streamed by name,
+     * since they are printed on a public certificate anyway.
+     */
+    public function signatureUrl(): ?string
+    {
+        return filled($this->signature_path)
+            ? route('certificates.signature', basename($this->signature_path))
+            : null;
     }
 
     public function downloadUrl(): string
