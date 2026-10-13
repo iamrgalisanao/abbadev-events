@@ -233,6 +233,41 @@ class RegistrationApiTest extends TestCase
             ->assertJsonPath('flags.duplicate', true);
     }
 
+    public function test_events_sharing_an_event_code_share_one_number_series(): void
+    {
+        $first = $this->event();
+        $second = Event::create([
+            'slug' => 'second-seminar',
+            'title' => 'Second Seminar',
+            'event_code' => 'SEM',
+            'expected_amount' => 399.00,
+            'is_active' => true,
+        ]);
+
+        $a = $this->makeRegistration($first, 'a@example.com');
+        $b = $this->makeRegistration($second, 'b@example.com');
+
+        $this->assertNotSame($a->registration_number, $b->registration_number);
+        $this->assertStringEndsWith('-0002', $b->registration_number);
+    }
+
+    public function test_numbering_stays_numeric_past_9999(): void
+    {
+        $event = $this->event();
+        $prefix = 'ABBA-SEM-' . now()->format('Y') . '-';
+
+        foreach (['9999', '10000'] as $n) {
+            Registration::create([
+                'registration_number' => $prefix . $n,
+                'name' => 'Juan',
+                'email' => "u{$n}@example.com",
+                'event_id' => $event->id,
+            ]);
+        }
+
+        $this->assertSame($prefix . '10001', Registration::generateNumber($event));
+    }
+
     protected function makeRegistration(Event $event, string $email = 'juan@example.com'): Registration
     {
         return Registration::create([

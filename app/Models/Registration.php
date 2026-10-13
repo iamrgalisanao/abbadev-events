@@ -47,22 +47,27 @@ class Registration extends Model
     /**
      * Generate the next registration number for an event, e.g. ABBA-SEM-2026-0041.
      *
-     * Sequence is per-event, per-year, derived from the highest number ever
-     * issued (MAX) rather than a row count — so deleting a registration never
-     * reissues an existing number. The 4-digit zero-padded suffix means the
-     * lexical max equals the numeric max. lockForUpdate serialises concurrent
-     * allocations when the caller wraps this in a transaction; the unique index
-     * and the caller's retry loop remain the final backstop.
+     * The sequence is per event-code prefix and year, not per event: the unique
+     * index on registration_number is global, so two events sharing a code
+     * (e.g. several seminars as SEM) must share one series or they would clash.
+     * It is derived from the highest number ever issued rather than a row
+     * count, so deleting a registration never reissues a number. Ordering by
+     * length first keeps the max numeric once the suffix grows past 4 digits
+     * (a plain string max would rank 9999 above 10000). lockForUpdate
+     * serialises concurrent allocations when the caller wraps this in a
+     * transaction; the unique index and the caller's retry loop remain the
+     * final backstop.
      */
     public static function generateNumber(Event $event): string
     {
         $year = now()->format('Y');
         $prefix = "ABBA-{$event->event_code}-{$year}-";
 
-        $lastNumber = static::where('event_id', $event->id)
-            ->where('registration_number', 'like', $prefix . '%')
+        $lastNumber = static::where('registration_number', 'like', $prefix . '%')
+            ->orderByRaw('LENGTH(registration_number) desc')
+            ->orderBy('registration_number', 'desc')
             ->lockForUpdate()
-            ->max('registration_number');
+            ->value('registration_number');
 
         $next = $lastNumber ? ((int) substr($lastNumber, strlen($prefix))) + 1 : 1;
 
