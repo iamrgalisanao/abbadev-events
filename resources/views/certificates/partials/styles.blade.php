@@ -215,6 +215,41 @@
            positioned inside it and painted over everything around it, so it can
            be sized and nudged into alignment without shifting the name, the
            role, or anything else in the footer. */
+        /* Signatories layout. The safe area between the swoops is 66cqw, and
+           it has to hold every signature block plus the QR, so the blocks
+           narrow (and their type steps down) as guests are added. */
+        .ecert-signatures--multi {
+            gap: 2.6cqw;
+            align-items: flex-end;
+        }
+
+        .ecert-signatures--multi .ecert-signature {
+            width: 21cqw;
+            align-self: flex-end;
+        }
+
+        .ecert-signatures--multi[data-signatories='3'] {
+            gap: 2cqw;
+        }
+
+        .ecert-signatures--multi[data-signatories='3'] .ecert-signature {
+            width: 16cqw;
+        }
+
+        .ecert-signatures--multi[data-signatories='3'] .ecert-signature-name {
+            font-size: 1.4cqw;
+        }
+
+        .ecert-signatures--multi[data-signatories='3'] .ecert-signature-role {
+            font-size: 0.95cqw;
+            letter-spacing: 0.03em;
+        }
+
+        .ecert-signatures--multi .ecert-signature-name,
+        .ecert-signatures--multi .ecert-signature-role {
+            overflow-wrap: anywhere;
+        }
+
         .ecert-signature-slot {
             position: relative;
             display: block;

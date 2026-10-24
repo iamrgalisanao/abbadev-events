@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\CertificateStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Arr;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class Certificate extends Model
 {
@@ -12,6 +14,7 @@ class Certificate extends Model
         'credential_id',
         'recipient_name',
         'certificate_title',
+        'layout',
         'presented_label',
         'activity_label',
         'activity_title',
@@ -25,6 +28,7 @@ class Certificate extends Model
         'signature_offset_y',
         'signatory_two_name',
         'signatory_two_role',
+        'guest_signatories',
         'issued_on',
         'duration',
         'footer_note',
@@ -46,6 +50,7 @@ class Certificate extends Model
         'signature_scale' => 'integer',
         'signature_offset_x' => 'integer',
         'signature_offset_y' => 'integer',
+        'guest_signatories' => 'array',
         'show_logo' => 'boolean',
         'show_seal' => 'boolean',
         'show_qr' => 'boolean',
@@ -68,6 +73,7 @@ class Certificate extends Model
         'credential_id',
         'recipient_name',
         'certificate_title',
+        'layout',
         'presented_label',
         'activity_label',
         'activity_title',
@@ -81,6 +87,7 @@ class Certificate extends Model
         'signature_offset_y',
         'signatory_two_name',
         'signatory_two_role',
+        'guest_signatories',
         'issued_on',
         'duration',
         'footer_note',
@@ -92,6 +99,28 @@ class Certificate extends Model
         'show_seal',
         'show_qr',
     ];
+
+    /**
+     * The most signatures one certificate carries: the founder plus guests.
+     * Past three the signature row stops fitting between the artwork's swoops.
+     */
+    public const MAX_GUEST_SIGNATORIES = 2;
+
+    /**
+     * Public URL for a stored or just-uploaded signature, whatever shape the
+     * form state holds it in: a stored path, a Livewire temporary upload, or
+     * the one-item array a file field wraps either in.
+     */
+    public static function signatureUrlFor(mixed $state): ?string
+    {
+        $file = is_array($state) ? Arr::first($state) : $state;
+
+        if ($file instanceof TemporaryUploadedFile) {
+            return $file->temporaryUrl();
+        }
+
+        return filled($file) ? route('certificates.signature', basename($file)) : null;
+    }
 
     public function registration(): BelongsTo
     {
@@ -120,9 +149,7 @@ class Certificate extends Model
      */
     public function signatureUrl(): ?string
     {
-        return filled($this->signature_path)
-            ? route('certificates.signature', basename($this->signature_path))
-            : null;
+        return static::signatureUrlFor($this->signature_path);
     }
 
     public function downloadUrl(): string

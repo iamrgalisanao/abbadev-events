@@ -60,6 +60,15 @@
         '--ecert-sig-x: '.((int) ($c['signature_offset_x'] ?? 0)).'%',
         '--ecert-sig-y: '.((int) ($c['signature_offset_y'] ?? 0)).'%',
     ])->implode('; ');
+    // The signatories layout: the founder first, then up to two guests. Past
+    // three signatures the row no longer fits between the artwork's swoops.
+    $multi = ($c['layout'] ?? 'standard') === 'signatories';
+    $guests = collect($c['guest_signatories'] ?? [])
+        ->filter(fn ($guest): bool => is_array($guest) && (filled($guest['name'] ?? null) || filled($guest['role'] ?? null)))
+        ->take(\App\Models\Certificate::MAX_GUEST_SIGNATORIES)
+        ->values();
+    $founderShown = filled($value('signatory_one_name')) || filled($value('signatory_one_role'));
+    $signatoryCount = $guests->count() + ($founderShown ? 1 : 0);
     $showQr = (bool) ($c['show_qr'] ?? true) && filled($verificationUrl);
     $showSeal = ! $showQr && (bool) ($c['show_seal'] ?? true);
 
@@ -126,8 +135,35 @@
         <footer class="ecert-foot">
             {{-- Centred row: the badge and whichever signatories are filled
                  in sit together, so one signatory is not left off-axis. --}}
-            <div class="ecert-signatures">
-                @if (filled($value('signatory_one_name')) || filled($value('signatory_one_role')))
+            <div class="ecert-signatures @if ($multi) ecert-signatures--multi @endif" data-signatories="{{ $signatoryCount }}">
+                @if ($multi)
+                    @if ($founderShown)
+                        @include('certificates.partials.signature-block', [
+                            'name' => $value('signatory_one_name'),
+                            'role' => $value('signatory_one_role'),
+                            'url' => $signatureUrl,
+                            'style' => $signatureStyle,
+                        ])
+                    @endif
+
+                    @foreach ($guests as $guest)
+                        @include('certificates.partials.signature-block', [
+                            'name' => trim((string) ($guest['name'] ?? '')),
+                            'role' => trim((string) ($guest['role'] ?? '')),
+                            'url' => \App\Models\Certificate::signatureUrlFor($guest['signature_path'] ?? null),
+                        ])
+                    @endforeach
+
+                    @if ($showQr)
+                        @include('certificates.partials.qr', ['url' => $verificationUrl])
+                    @elseif ($showSeal)
+                        @include('certificates.partials.seal', [
+                            'label' => $value('seal_label', 'CERTIFIED'),
+                            'year' => $sealYear,
+                        ])
+                    @endif
+                @else
+                @if ($founderShown)
                     <div class="ecert-signature">
                         @if (filled($signatureUrl))
                             <span class="ecert-signature-slot">
@@ -162,6 +198,7 @@
                         <p class="ecert-signature-name">{{ $value('signatory_two_name', ' ') }}</p>
                         <p class="ecert-signature-role">{{ $value('signatory_two_role') }}</p>
                     </div>
+                @endif
                 @endif
             </div>
 

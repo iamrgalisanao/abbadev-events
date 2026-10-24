@@ -12,11 +12,13 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Slider;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -25,10 +27,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Fill-in-the-blanks e-certificate builder. Everything is typed by hand (or
@@ -199,9 +199,19 @@ class CertificateGenerator extends Page
                     ]),
 
                 Section::make('Signatory')
-                    ->description('One signature, printed beside the verification QR.')
+                    ->description('The founder signs every certificate. Choose "With signatories" to add guests beside them.')
                     ->columns(2)
                     ->schema([
+                        ToggleButtons::make('layout')
+                            ->label('Layout')
+                            ->options([
+                                'standard' => 'Standard',
+                                'signatories' => 'With signatories',
+                            ])
+                            ->default('standard')
+                            ->inline()
+                            ->live()
+                            ->columnSpanFull(),
                         TextInput::make('signatory_one_name')
                             ->label('Name')
                             ->maxLength(80)
@@ -242,6 +252,43 @@ class CertificateGenerator extends Page
                             ->step(2)
                             ->visible(fn (callable $get): bool => filled($get('signature_path')))
                             ->live(onBlur: true),
+                    ]),
+
+                Section::make('Guest signatories')
+                    ->description('Up to two guests print after the founder, left to right, with the verification QR at the end. A guest without an uploaded signature gets a blank line to sign by hand.')
+                    ->visible(fn (callable $get): bool => $get('layout') === 'signatories')
+                    ->schema([
+                        Repeater::make('guest_signatories')
+                            ->hiddenLabel()
+                            ->addActionLabel('Add signatory')
+                            ->maxItems(Certificate::MAX_GUEST_SIGNATORIES)
+                            ->itemLabel(fn (array $state): string => filled($state['name'] ?? null) ? $state['name'] : 'Guest signatory')
+                            ->columns(2)
+                            ->live()
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Name')
+                                    ->maxLength(60)
+                                    ->required()
+                                    ->live(onBlur: true),
+                                TextInput::make('role')
+                                    ->label('Role')
+                                    ->default('Guest Speaker')
+                                    ->maxLength(60)
+                                    ->live(onBlur: true),
+                                FileUpload::make('signature_path')
+                                    ->label('Signature')
+                                    ->helperText('Optional. Same rules as the founder signature: dark ink on white or transparent.')
+                                    ->image()
+                                    ->disk('local')
+                                    ->directory(Certificate::SIGNATURE_DIRECTORY)
+                                    ->visibility('private')
+                                    ->maxSize(2048)
+                                    ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+                                    ->imagePreviewHeight('60')
+                                    ->live()
+                                    ->columnSpanFull(),
+                            ]),
                     ]),
 
                 Section::make('Credential')
@@ -630,14 +677,7 @@ class CertificateGenerator extends Page
      */
     public function getSignatureUrl(): ?string
     {
-        $state = $this->data['signature_path'] ?? null;
-        $file = is_array($state) ? Arr::first($state) : $state;
-
-        if ($file instanceof TemporaryUploadedFile) {
-            return $file->temporaryUrl();
-        }
-
-        return filled($file) ? route('certificates.signature', basename($file)) : null;
+        return Certificate::signatureUrlFor($this->data['signature_path'] ?? null);
     }
 
     /**
@@ -736,6 +776,8 @@ class CertificateGenerator extends Page
             'registration_id' => null,
             'recipient_name' => '',
             'certificate_title' => 'Certificate of Participation',
+            'layout' => 'standard',
+            'guest_signatories' => [],
             'presented_label' => 'is presented to',
             'activity_label' => 'for participating in the webinar',
             'activity_title' => '',
