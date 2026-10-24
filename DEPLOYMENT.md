@@ -110,15 +110,20 @@ with headless Chrome (spatie/browsershot + Puppeteer) and returns one ZIP.
 
 ```bash
 cd /var/www/abbadev-events
-npm install                      # installs puppeteer and downloads its Chrome
-sudo chown -R www-data:www-data node_modules
+npm install
+# Chrome must live where the web user looks for it, so install it as www-data
+# (running `npm install` as root leaves it in /root/.cache, which www-data
+# cannot see):
+sudo mkdir -p /var/www/.cache/puppeteer && sudo chown -R www-data:www-data /var/www/.cache
+sudo -u www-data node_modules/.bin/puppeteer browsers install chrome-headless-shell
 ```
 
-Chrome needs a few system libraries on a bare Ubuntu server:
+Chrome needs a few system libraries on a bare Ubuntu 24.04 server (on 22.04 drop the `t64` suffixes and use `libasound2`):
 
 ```bash
-sudo apt install -y libnss3 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
-  libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64 libpango-1.0-0 fonts-liberation
+sudo apt install -y libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 \
+  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
+  libasound2t64 libpango-1.0-0 libcairo2 libnss3 libnspr4 fonts-liberation
 ```
 
 If `www-data` cannot find Node, or you use a system Chrome instead of

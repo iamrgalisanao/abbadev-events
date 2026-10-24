@@ -51,6 +51,11 @@ class CertificatePdfRenderer
             $shot->noSandbox();
         }
 
+        // The crash reporter wants a writable home directory, which a web
+        // server user such as www-data does not have, and Chrome dies on start
+        // ("chrome_crashpad_handler: --database is required").
+        $shot->addChromiumArguments(['disable-crash-reporter', 'disable-breakpad']);
+
         return $shot->pdf();
     }
 
