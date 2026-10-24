@@ -41,6 +41,81 @@ class PaymentService
     }
 
     /**
+     * Bulk-confirm payments, DB side only (fast, no network). Each payment is
+     * confirmed in its own transaction so one failure never rolls back the
+     * rest, and its row is re-read under a lock so a payment another admin has
+     * already handled is never confirmed twice. Only payments still awaiting
+     * verification qualify: amount-mismatch, duplicate, rejected and already
+     * verified rows are skipped, never silently confirmed.
+     *
+     * Emails are not sent here; pass the returned payments to
+     * sendConfirmationEmails() once the response is out.
+     *
+     * @param  iterable<Payment>  $payments
+     * @return array{confirmed: list<Payment>, skipped: int}
+     */
+    public function confirmMany(iterable $payments, User $verifier, ?string $notes = null): array
+    {
+        $confirmed = [];
+        $skipped = 0;
+
+        foreach ($payments as $payment) {
+            $done = DB::transaction(function () use ($payment, $verifier, $notes) {
+                $locked = Payment::whereKey($payment->getKey())->lockForUpdate()->first();
+
+                if (! $locked || $locked->status !== PaymentStatus::ForVerification) {
+                    return null;
+                }
+
+                $locked->forceFill([
+                    'status' => PaymentStatus::Verified,
+                    'verified_by' => $verifier->id,
+                    'verified_at' => now(),
+                    'verification_notes' => $notes,
+                ])->save();
+
+                $locked->registration->forceFill([
+                    'status' => RegistrationStatus::Confirmed,
+                ])->save();
+
+                return $locked;
+            });
+
+            $done ? $confirmed[] = $done : $skipped++;
+        }
+
+        return ['confirmed' => $confirmed, 'skipped' => $skipped];
+    }
+
+    /**
+     * Send (or resend) the confirmation email for verified payments, one at a
+     * time. Payments whose email already went out are skipped, so running this
+     * twice never double-emails a registrant.
+     *
+     * @param  iterable<Payment>  $payments
+     * @return array{sent: int, failed: int, skipped: int}
+     */
+    public function sendConfirmationEmails(iterable $payments): array
+    {
+        $result = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
+
+        foreach ($payments as $payment) {
+            $payment->refresh();
+
+            if ($payment->status !== PaymentStatus::Verified || $payment->email_status === EmailStatus::Sent) {
+                $result['skipped']++;
+
+                continue;
+            }
+
+            $this->sendConfirmationEmail($payment);
+            $payment->refresh()->email_status === EmailStatus::Sent ? $result['sent']++ : $result['failed']++;
+        }
+
+        return $result;
+    }
+
+    /**
      * Mark a payment rejected / duplicate / amount_mismatch without confirming
      * the registration or sending an email.
      */

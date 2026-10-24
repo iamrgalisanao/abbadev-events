@@ -24,6 +24,7 @@ class ViewPayment extends ViewRecord
                 ->openUrlInNewTab()
                 ->visible(fn (Payment $record) => (bool) $record->receipt_path),
             PaymentActions::confirm(),
+            PaymentActions::resendEmail(),
             PaymentActions::reject(),
             PaymentActions::markDuplicate(),
             PaymentActions::markMismatch(),

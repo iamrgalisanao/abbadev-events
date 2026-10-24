@@ -20,8 +20,7 @@ class PaymentServiceTest extends TestCase
 
     protected function payment(): Payment
     {
-        $event = Event::create([
-            'slug' => 'idea-to-intelligent-system',
+        $event = Event::firstOrCreate(['slug' => 'idea-to-intelligent-system'], [
             'title' => 'From Idea to Intelligent System',
             'event_code' => 'SEM',
             'expected_amount' => 399.00,
@@ -97,5 +96,45 @@ class PaymentServiceTest extends TestCase
         $this->assertSame(PaymentStatus::Rejected, $payment->status);
         $this->assertSame(RegistrationStatus::Pending, $payment->registration->status);
         $this->assertSame(EmailStatus::NotSent, $payment->email_status);
+    }
+
+    public function test_confirm_many_only_confirms_payments_awaiting_verification(): void
+    {
+        $service = app(PaymentService::class);
+        $admin = User::factory()->create(['email' => 'admin@abbadev.com']);
+
+        $ok = $this->payment();
+        $mismatch = $this->payment();
+        $mismatch->update(['status' => PaymentStatus::AmountMismatch]);
+        $verified = $this->payment();
+        $verified->update(['status' => PaymentStatus::Verified]);
+
+        $result = $service->confirmMany([$ok, $mismatch, $verified], $admin, 'batch');
+
+        $this->assertCount(1, $result['confirmed']);
+        $this->assertSame(2, $result['skipped']);
+        $this->assertSame(PaymentStatus::Verified, $ok->refresh()->status);
+        $this->assertSame(RegistrationStatus::Confirmed, $ok->registration->status);
+        $this->assertSame(PaymentStatus::AmountMismatch, $mismatch->refresh()->status);
+        $this->assertSame(RegistrationStatus::Pending, $mismatch->registration->status);
+    }
+
+    public function test_send_confirmation_emails_skips_already_sent_and_unverified(): void
+    {
+        config()->set('n8n.payment_confirmed_url', 'https://n8n.test/webhook/x');
+        Http::fake(['n8n.test/*' => Http::response(['ok' => true], 200)]);
+
+        $service = app(PaymentService::class);
+        $failed = $this->payment();
+        $failed->update(['status' => PaymentStatus::Verified, 'email_status' => EmailStatus::Failed]);
+        $sent = $this->payment();
+        $sent->update(['status' => PaymentStatus::Verified, 'email_status' => EmailStatus::Sent]);
+        $pending = $this->payment();
+
+        $result = $service->sendConfirmationEmails([$failed, $sent, $pending]);
+
+        $this->assertSame(['sent' => 1, 'failed' => 0, 'skipped' => 2], $result);
+        $this->assertSame(EmailStatus::Sent, $failed->refresh()->email_status);
+        Http::assertSentCount(1);
     }
 }

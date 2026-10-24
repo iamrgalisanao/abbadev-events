@@ -47,6 +47,9 @@ class PaymentsTable
                     ->copyable(),
                 TextColumn::make('status')
                     ->badge(),
+                TextColumn::make('email_status')
+                    ->label('Email')
+                    ->badge(),
                 TextColumn::make('created_at')
                     ->label('Submitted')
                     ->dateTime('M j, Y g:i A')
@@ -60,10 +63,13 @@ class PaymentsTable
             ->recordActions([
                 ViewAction::make(),
                 PaymentActions::confirm(),
+                PaymentActions::resendEmail(),
                 PaymentActions::delete(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    PaymentActions::bulkConfirm(),
+                    PaymentActions::bulkResendEmail(),
                     DeleteBulkAction::make()
                         ->modalDescription('This permanently deletes the selected payments, their receipts, and registrations.')
                         ->before(function ($records): void {

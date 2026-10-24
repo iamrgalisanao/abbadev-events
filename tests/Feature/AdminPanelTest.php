@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\Registration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -73,6 +74,22 @@ class AdminPanelTest extends TestCase
             ->test(ListPayments::class)
             ->assertOk()
             ->assertSee($payment->registration->registration_number);
+    }
+
+    public function test_bulk_confirm_confirms_selected_and_sends_emails(): void
+    {
+        config()->set('n8n.payment_confirmed_url', 'https://n8n.test/webhook/x');
+        \Illuminate\Support\Facades\Http::fake(['n8n.test/*' => \Illuminate\Support\Facades\Http::response(['ok' => true], 200)]);
+
+        $payment = $this->payment();
+
+        Livewire::actingAs($this->admin())
+            ->test(ListPayments::class)
+            ->selectTableRecords([$payment->getKey()])
+            ->callAction(TestAction::make('bulkConfirm')->table()->bulk(), data: ['notes' => 'ok'])
+            ->assertNotified();
+
+        $this->assertSame(PaymentStatus::Verified, $payment->refresh()->status);
     }
 
     public function test_view_page_renders(): void
