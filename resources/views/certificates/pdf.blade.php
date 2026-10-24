@@ -6,8 +6,8 @@
 
     @include('certificates.partials.styles')
 
-    {{-- Rendered by headless Chrome straight to one A4 landscape page, so the
-         print rules of the download view apply unconditionally here. --}}
+    {{-- Screenshotted by headless Chrome at 3x (see CertificatePdfRenderer), so
+         the sheet is a fixed A4-landscape pixel size, edge to edge. --}}
     @verbatim
         <style>
             @page {
@@ -17,8 +17,8 @@
 
             html,
             body {
-                width: 297mm;
-                height: 210mm;
+                width: 1123px;
+                height: 794px;
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
@@ -28,8 +28,8 @@
             }
 
             .ecert-frame {
-                width: 297mm;
-                height: 210mm;
+                width: 1123px;
+                height: 794px;
                 aspect-ratio: auto;
                 border-radius: 0;
                 box-shadow: none;

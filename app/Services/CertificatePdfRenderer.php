@@ -16,24 +16,65 @@ use ZipArchive;
 class CertificatePdfRenderer
 {
     /**
-     * Bulk downloads are rendered while the request waits, so the batch size is
-     * capped to keep it inside the web server's timeout.
+     * Bulk downloads are rendered while the request waits (about 4 seconds per
+     * certificate), so the batch size is capped to keep it inside the web
+     * server's request timeout, 60 seconds by default.
      */
-    public const MAX_BATCH = 40;
+    public static function maxBatch(): int
+    {
+        return max(1, (int) config('services.browsershot.max_batch', 15));
+    }
 
+    /** A4 landscape at 96 dpi, and the resolution multiplier for the image. */
+    protected const SHEET_WIDTH_PX = 1123;
+
+    protected const SHEET_HEIGHT_PX = 794;
+
+    protected const SCALE = 3;
+
+    /**
+     * The certificate as a one-page A4 landscape PDF.
+     *
+     * Chrome's own PDF output turns the design's gradient text, transparent
+     * gradients, SVG artwork and blend modes into constructs that PDF viewers
+     * draw differently, so a "vector" PDF came out looking different in each.
+     * Instead the page is rendered exactly as the browser shows it, at 3x, and
+     * that image is placed full-bleed on the sheet: every viewer shows the same
+     * certificate. The trade-off is that the text is not selectable.
+     */
     public function pdf(Certificate $certificate): string
     {
         $html = view('certificates.pdf', ['certificate' => $certificate])->render();
 
-        $config = config('services.browsershot');
+        $image = $this->configure(Browsershot::html($html))
+            ->windowSize(self::SHEET_WIDTH_PX, self::SHEET_HEIGHT_PX)
+            ->deviceScaleFactor(self::SCALE)
+            ->setScreenshotType('jpeg', 92)
+            ->waitUntilNetworkIdle()
+            ->setDelay(300)
+            ->screenshot();
 
-        $shot = Browsershot::html($html)
-            ->setTimeout($config['timeout'])
+        $sheet = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+            .'@page{size:297mm 210mm;margin:0}'
+            .'html,body{margin:0;padding:0;width:297mm;height:210mm;overflow:hidden;background:#0a1a33}'
+            .'img{display:block;width:297mm;height:210mm}'
+            .'</style></head><body><img src="data:image/jpeg;base64,'.base64_encode($image).'"></body></html>';
+
+        return $this->configure(Browsershot::html($sheet))
             ->paperSize(297, 210, 'mm')
             ->margins(0, 0, 0, 0)
             ->showBackground()
-            ->waitUntilNetworkIdle()
-            ->setDelay(300);
+            ->pdf();
+    }
+
+    /**
+     * Binaries, sandbox and timeout settings shared by both Chrome runs.
+     */
+    protected function configure(Browsershot $shot): Browsershot
+    {
+        $config = config('services.browsershot');
+
+        $shot->timeout($config['timeout']);
 
         if ($config['node_binary']) {
             $shot->setNodeBinary($config['node_binary']);
@@ -56,7 +97,7 @@ class CertificatePdfRenderer
         // ("chrome_crashpad_handler: --database is required").
         $shot->addChromiumArguments(['disable-crash-reporter', 'disable-breakpad']);
 
-        return $shot->pdf();
+        return $shot;
     }
 
     /**

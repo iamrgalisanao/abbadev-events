@@ -45,6 +45,9 @@ return [
         // Chrome refuses to start as root or inside many containers without it.
         'no_sandbox' => (bool) env('BROWSERSHOT_NO_SANDBOX', true),
         'timeout' => (int) env('BROWSERSHOT_TIMEOUT', 90),
+        // Certificates per bulk download. Raise it together with the web
+        // server's request timeout (nginx fastcgi_read_timeout).
+        'max_batch' => (int) env('BROWSERSHOT_MAX_BATCH', 15),
     ],
 
 ];

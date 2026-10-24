@@ -90,9 +90,9 @@ class CertificatesTable
                                 return null;
                             }
 
-                            if ($active->count() > CertificatePdfRenderer::MAX_BATCH) {
+                            if ($active->count() > CertificatePdfRenderer::maxBatch()) {
                                 Notification::make()
-                                    ->title('Select '.CertificatePdfRenderer::MAX_BATCH.' or fewer')
+                                    ->title('Select '.CertificatePdfRenderer::maxBatch().' or fewer')
                                     ->body('You selected '.$active->count().'. Download in smaller batches so the file finishes building.')
                                     ->danger()
                                     ->send();

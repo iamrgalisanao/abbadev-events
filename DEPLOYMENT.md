@@ -128,8 +128,9 @@ sudo apt install -y libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 \
 
 If `www-data` cannot find Node, or you use a system Chrome instead of
 Puppeteer's, set these in `.env` (all optional): `BROWSERSHOT_NODE_BINARY`,
-`BROWSERSHOT_NPM_BINARY`, `BROWSERSHOT_CHROME_PATH`. Selections are capped at 40
-certificates per download. The server also needs outbound access to
+`BROWSERSHOT_NPM_BINARY`, `BROWSERSHOT_CHROME_PATH`. Each certificate takes about 4 seconds, so selections are capped at 15 per
+download (`BROWSERSHOT_MAX_BATCH`). To allow more, raise it together with the
+web server timeout (nginx `fastcgi_read_timeout 300;`, then reload nginx). The server also needs outbound access to
 fonts.googleapis.com for the certificate font.
 
 ## Optional: queue worker
