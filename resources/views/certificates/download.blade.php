@@ -126,6 +126,7 @@
                 ?? asset('images/abbadev_certificate_background.svg'),
             'logoUrl' => $inline(public_path('images/abbadev-logo.png'))
                 ?? asset('images/abbadev-logo.png'),
+            'inlineSignature' => fn ($stored) => \App\Support\InlineAsset::signature($stored),
         ])
     </div>
 

@@ -103,6 +103,30 @@ php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan filament:optimize
 ```
 
+## Bulk PDF download (Node + Chrome)
+
+The certificates table's "Download as PDFs" bulk action renders each certificate
+with headless Chrome (spatie/browsershot + Puppeteer) and returns one ZIP.
+
+```bash
+cd /var/www/abbadev-events
+npm install                      # installs puppeteer and downloads its Chrome
+sudo chown -R www-data:www-data node_modules
+```
+
+Chrome needs a few system libraries on a bare Ubuntu server:
+
+```bash
+sudo apt install -y libnss3 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
+  libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64 libpango-1.0-0 fonts-liberation
+```
+
+If `www-data` cannot find Node, or you use a system Chrome instead of
+Puppeteer's, set these in `.env` (all optional): `BROWSERSHOT_NODE_BINARY`,
+`BROWSERSHOT_NPM_BINARY`, `BROWSERSHOT_CHROME_PATH`. Selections are capped at 40
+certificates per download. The server also needs outbound access to
+fonts.googleapis.com for the certificate font.
+
 ## Optional: queue worker
 
 Phase 1 calls n8n synchronously, so no worker is required. If you later move

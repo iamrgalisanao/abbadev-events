@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Certificate;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
+
 class InlineAsset
 {
     /**
@@ -26,6 +30,22 @@ class InlineAsset
         }
 
         return 'data:'.static::mimeType($absolutePath).';base64,'.base64_encode($contents);
+    }
+
+    /**
+     * A stored e-signature as a data URI, falling back to its public URL when
+     * the file is missing from disk.
+     */
+    public static function signature(mixed $stored): ?string
+    {
+        $path = is_array($stored) ? Arr::first($stored) : $stored;
+
+        if (blank($path) || ! is_string($path)) {
+            return Certificate::signatureUrlFor($stored);
+        }
+
+        return static::dataUri(Storage::disk('local')->path($path))
+            ?? Certificate::signatureUrlFor($path);
     }
 
     protected static function mimeType(string $path): string

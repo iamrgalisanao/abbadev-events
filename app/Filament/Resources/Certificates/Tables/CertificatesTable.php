@@ -4,13 +4,18 @@ namespace App\Filament\Resources\Certificates\Tables;
 
 use App\Enums\CertificateStatus;
 use App\Filament\Certificates\CertificateActions;
+use App\Services\CertificatePdfRenderer;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class CertificatesTable
 {
@@ -69,6 +74,52 @@ class CertificatesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('downloadPdfs')
+                        ->label('Download as PDFs')
+                        ->icon(Heroicon::OutlinedArrowDownTray)
+                        ->modalHeading('Download selected certificates')
+                        ->modalDescription('Each certificate is saved as its own PDF, named after the participant, and the lot arrives as a single ZIP. Revoked certificates are left out.')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records, CertificatePdfRenderer $renderer) {
+                            $active = $records->filter(fn ($certificate): bool => $certificate->isActive())->values();
+
+                            if ($active->isEmpty()) {
+                                Notification::make()->title('Nothing to download')->body('Every selected certificate is revoked.')->warning()->send();
+
+                                return null;
+                            }
+
+                            if ($active->count() > CertificatePdfRenderer::MAX_BATCH) {
+                                Notification::make()
+                                    ->title('Select '.CertificatePdfRenderer::MAX_BATCH.' or fewer')
+                                    ->body('You selected '.$active->count().'. Download in smaller batches so the file finishes building.')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            set_time_limit(0);
+
+                            try {
+                                $path = $renderer->zip($active);
+                            } catch (\Throwable $e) {
+                                report($e);
+
+                                Notification::make()
+                                    ->title('Could not build the PDFs')
+                                    ->body('Check that Node and Chrome are installed on the server (see DEPLOYMENT.md).')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            return response()
+                                ->download($path, 'certificates-'.now()->format('Y-m-d-His').'.zip')
+                                ->deleteFileAfterSend(true);
+                        }),
                     DeleteBulkAction::make()
                         ->modalDescription('Any QR already printed for the selected credentials will stop resolving. To withdraw certificates that have been handed out, revoke them instead.'),
                 ]),

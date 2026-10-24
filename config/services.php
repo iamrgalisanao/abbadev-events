@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    // Headless Chrome, driven by spatie/browsershot, renders certificates to
+    // PDF for the bulk "Download as PDFs" action. Leave the binaries unset to
+    // let Browsershot find node/npm on the PATH and use Puppeteer's own Chrome.
+    'browsershot' => [
+        'node_binary' => env('BROWSERSHOT_NODE_BINARY'),
+        'npm_binary' => env('BROWSERSHOT_NPM_BINARY'),
+        'chrome_path' => env('BROWSERSHOT_CHROME_PATH'),
+        // Chrome refuses to start as root or inside many containers without it.
+        'no_sandbox' => (bool) env('BROWSERSHOT_NO_SANDBOX', true),
+        'timeout' => (int) env('BROWSERSHOT_TIMEOUT', 90),
+    ],
+
 ];

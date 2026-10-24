@@ -150,7 +150,9 @@
                         @include('certificates.partials.signature-block', [
                             'name' => trim((string) ($guest['name'] ?? '')),
                             'role' => trim((string) ($guest['role'] ?? '')),
-                            'url' => \App\Models\Certificate::signatureUrlFor($guest['signature_path'] ?? null),
+                            'url' => isset($inlineSignature)
+                                ? $inlineSignature($guest['signature_path'] ?? null)
+                                : \App\Models\Certificate::signatureUrlFor($guest['signature_path'] ?? null),
                             'style' => collect([
                                 '--ecert-sig-scale: '.((int) ($guest['signature_scale'] ?? 80)).'%',
                                 '--ecert-sig-x: '.((int) ($guest['signature_offset_x'] ?? 0)).'%',
