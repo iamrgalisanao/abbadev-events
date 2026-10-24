@@ -10,6 +10,16 @@
 
 @verbatim
     <style>
+        /* The admin panel and the verify page both reset box-sizing, but the
+           download page does not. Without it the body's padding is added on top
+           of its 100% height, pushing the bottom row out of the sheet. */
+        .ecert-frame,
+        .ecert-frame *,
+        .ecert-frame *::before,
+        .ecert-frame *::after {
+            box-sizing: border-box;
+        }
+
         .ecert-frame {
             --ecert-navy-0: oklch(15.5% 0.042 252);
             --ecert-navy-1: oklch(20% 0.05 252);

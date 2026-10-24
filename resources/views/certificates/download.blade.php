@@ -64,8 +64,18 @@
             }
 
             @media print {
+                /* Same print setup as the generator: no page margin, nothing
+                   but the sheet, exactly one A4 landscape page. */
+                html,
                 body {
+                    width: 297mm;
+                    height: 210mm;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden;
                     background: #fff;
+                    print-color-adjust: exact;
+                    -webkit-print-color-adjust: exact;
                 }
 
                 .dl-bar {
