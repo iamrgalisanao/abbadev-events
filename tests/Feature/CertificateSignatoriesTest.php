@@ -45,6 +45,9 @@ class CertificateSignatoriesTest extends TestCase
                 'name' => 'Dr. Maria Santos',
                 'role' => 'Guest Speaker',
                 'signature_path' => Certificate::SIGNATURE_DIRECTORY.'/guest.png',
+                'signature_scale' => 110,
+                'signature_offset_x' => -12,
+                'signature_offset_y' => 6,
             ]],
         ]);
 
@@ -53,7 +56,10 @@ class CertificateSignatoriesTest extends TestCase
             ->assertSee('data-signatories="2"', escape: false)
             ->assertSee('Rommel Galisanao')
             ->assertSee('Dr. Maria Santos')
-            ->assertSee(route('certificates.signature', 'guest.png'), escape: false);
+            ->assertSee(route('certificates.signature', 'guest.png'), escape: false)
+            ->assertSee('--ecert-sig-scale: 110%', escape: false)
+            ->assertSee('--ecert-sig-x: -12%', escape: false)
+            ->assertSee('--ecert-sig-y: 6%', escape: false);
     }
 
     public function test_no_more_than_three_signatures_are_printed(): void

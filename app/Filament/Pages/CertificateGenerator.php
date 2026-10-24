@@ -278,7 +278,7 @@ class CertificateGenerator extends Page
                                     ->live(onBlur: true),
                                 FileUpload::make('signature_path')
                                     ->label('Signature')
-                                    ->helperText('Optional. Same rules as the founder signature: dark ink on white or transparent.')
+                                    ->helperText('Optional. Same rules as the founder signature: dark ink on white or transparent. Size and position are adjustable below once it is uploaded.')
                                     ->image()
                                     ->disk('local')
                                     ->directory(Certificate::SIGNATURE_DIRECTORY)
@@ -288,6 +288,29 @@ class CertificateGenerator extends Page
                                     ->imagePreviewHeight('60')
                                     ->live()
                                     ->columnSpanFull(),
+                                Slider::make('signature_scale')
+                                    ->label('Signature size')
+                                    ->helperText('Width as a percentage of the line it sits on.')
+                                    ->default(80)
+                                    ->range(20, 160)
+                                    ->step(5)
+                                    ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                                    ->live(onBlur: true)
+                                    ->columnSpanFull(),
+                                Slider::make('signature_offset_x')
+                                    ->label('Nudge left / right')
+                                    ->default(0)
+                                    ->range(-60, 60)
+                                    ->step(2)
+                                    ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                                    ->live(onBlur: true),
+                                Slider::make('signature_offset_y')
+                                    ->label('Nudge up / down')
+                                    ->default(0)
+                                    ->range(-60, 60)
+                                    ->step(2)
+                                    ->visible(fn (callable $get): bool => filled($get('signature_path')))
+                                    ->live(onBlur: true),
                             ]),
                     ]),
 

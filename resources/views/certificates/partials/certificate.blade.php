@@ -151,6 +151,11 @@
                             'name' => trim((string) ($guest['name'] ?? '')),
                             'role' => trim((string) ($guest['role'] ?? '')),
                             'url' => \App\Models\Certificate::signatureUrlFor($guest['signature_path'] ?? null),
+                            'style' => collect([
+                                '--ecert-sig-scale: '.((int) ($guest['signature_scale'] ?? 80)).'%',
+                                '--ecert-sig-x: '.((int) ($guest['signature_offset_x'] ?? 0)).'%',
+                                '--ecert-sig-y: '.((int) ($guest['signature_offset_y'] ?? 0)).'%',
+                            ])->implode('; '),
                         ])
                     @endforeach
 
